@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Dedications collection - allow read/write for now (add auth later)
+    match /dedications/{dedicationId} {
+      // Anyone can read dedications (to view them)
+      allow read: if true;
+      
+      // Anyone can create dedications
+      allow create: if true;
+      
+      // Allow updates (for view counts, status changes)
+      allow update: if true;
+      
+      // Don't allow deletes for now
+      allow delete: if false;
+    }
+  }
+}

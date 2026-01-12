@@ -1,0 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 20% 98%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 340 82% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 20% 94%;
+    --secondary-foreground: 0 0% 8%;
+
+    --muted: 30 15% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 25 95% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
+    --ring: 340 82% 60%;
+
+    --radius: 1rem;
+
+    /* Custom Anon colors */
+    --anon-pink: 340 82% 60%;
+    --anon-rose: 350 80% 55%;
+    --anon-orange: 25 95% 60%;
+    --anon-dark: 0 0% 4%;
+    --anon-cream: 30 20% 98%;
+    
+    /* Theme colors */
+    --theme-crush-bg: 340 80% 95%;
+    --theme-crush-primary: 340 82% 60%;
+    --theme-crush-secondary: 350 80% 55%;
+    
+    --theme-partner-bg: 0 75% 95%;
+    --theme-partner-primary: 0 75% 55%;
+    --theme-partner-secondary: 350 80% 55%;
+    
+    --theme-friend-bg: 200 80% 95%;
+    --theme-friend-primary: 200 80% 50%;
+    --theme-friend-secondary: 190 80% 45%;
+    
+    --theme-bestfriend-bg: 270 70% 95%;
+    --theme-bestfriend-primary: 270 70% 55%;
+    --theme-bestfriend-secondary: 280 70% 50%;
+    
+    --theme-parents-bg: 145 60% 95%;
+    --theme-parents-primary: 145 60% 45%;
+    --theme-parents-secondary: 155 60% 40%;
+    
+    --theme-relative-bg: 30 80% 95%;
+    --theme-relative-primary: 30 80% 50%;
+    --theme-relative-secondary: 35 80% 45%;
+    
+    --theme-special-bg: 280 70% 95%;
+    --theme-special-primary: 340 82% 60%;
+    --theme-special-secondary: 25 95% 60%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 340 82% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 25 95% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 340 82% 60%;
+    
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .font-display {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-gradient-to-r from-[hsl(var(--anon-pink))] via-[hsl(var(--anon-rose))] to-[hsl(var(--anon-orange))] bg-clip-text text-transparent;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-r from-[hsl(var(--anon-pink))] via-[hsl(var(--anon-rose))] to-[hsl(var(--anon-orange))];
+  }
+  
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl;
+  }
+  
+  .glass-card-dark {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
+  
+  .anon-shadow {
+    box-shadow: 0 8px 32px -8px hsl(var(--anon-pink) / 0.25);
+  }
+  
+  .anon-glow {
+    box-shadow: 0 0 40px hsl(var(--anon-pink) / 0.4);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
