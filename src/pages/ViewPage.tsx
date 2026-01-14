@@ -1,9 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { Gift, Play, Pause, Heart, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { Gift, Play, Pause, Heart, ArrowRight, Sparkles, Loader2, Share2, X, Download } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import html2canvas from 'html2canvas';
 import AnimatedButton from '@/components/AnimatedButton';
 import FloatingHearts from '@/components/FloatingHearts';
+import StoryCard from '@/components/StoryCard';
 import { getThemeById, Theme } from '@/lib/themes';
 import { DedicationData, SongData } from '@/lib/dedicationStore';
 import { getDedication, incrementViews } from '@/lib/firebase';
@@ -25,10 +27,21 @@ const ViewPage = () => {
   const [showFullMessage, setShowFullMessage] = useState(false);
   const [songData, setSongData] = useState<SongData | null>(null);
   const [hasNotifiedView, setHasNotifiedView] = useState(false);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [showStoryModal, setShowStoryModal] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const storyCardRef = useRef<HTMLDivElement>(null);
 
   const parseSongData = (dedication: DedicationData) => {
-    if (dedication.songUrl) {
+    // First check if there's already parsed songData in the dedication
+    // @ts-ignore - songData may exist from decryption
+    if (dedication.songData) {
+      // @ts-ignore
+      setSongData(dedication.songData);
+      return;
+    }
+    // Fall back to parsing songUrl
+    if (dedication.songUrl && dedication.songUrl !== '[ENCRYPTED]') {
       try {
         const parsed = JSON.parse(dedication.songUrl);
         setSongData(parsed);
@@ -38,21 +51,194 @@ const ViewPage = () => {
     }
   };
 
+  // Generate story image from current view
+  const captureAndShareView = async () => {
+    setIsGeneratingStory(true);
+    
+    try {
+      // Capture the entire view
+      const viewElement = document.querySelector('[data-dedication-view]') as HTMLElement;
+      if (!viewElement) return;
+      
+      // Wait a bit for any animations to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const canvas = await html2canvas(viewElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        logging: false,
+        width: viewElement.offsetWidth,
+        height: viewElement.offsetHeight,
+      });
+      
+      // Calculate 9:16 ratio crop
+      const targetRatio = 9 / 16;
+      const sourceRatio = canvas.width / canvas.height;
+      
+      let cropWidth = canvas.width;
+      let cropHeight = canvas.height;
+      let cropX = 0;
+      let cropY = 0;
+      
+      if (sourceRatio > targetRatio) {
+        // Source is wider, crop sides
+        cropWidth = canvas.height * targetRatio;
+        cropX = (canvas.width - cropWidth) / 2;
+      } else {
+        // Source is taller, crop top/bottom
+        cropHeight = canvas.width / targetRatio;
+        cropY = (canvas.height - cropHeight) / 2;
+      }
+      
+      // Create a new canvas with 9:16 ratio
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = 1080; // Instagram story width
+      finalCanvas.height = 1920; // Instagram story height
+      const ctx = finalCanvas.getContext('2d');
+      
+      if (ctx) {
+        // Draw the cropped portion
+        ctx.drawImage(
+          canvas,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, finalCanvas.width, finalCanvas.height
+        );
+      }
+      
+      const imageBlob = await new Promise<Blob>((resolve) => {
+        finalCanvas.toBlob((blob) => {
+          resolve(blob!);
+        }, 'image/png', 1.0);
+      });
+      
+      // Create file for sharing
+      const file = new File([imageBlob], 'justanote-story.png', { type: 'image/png' });
+      
+      // Check if we're on mobile
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      // Check if Web Share API with files is supported (mobile)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          // Use native share - this opens share sheet where user can select Instagram
+          await navigator.share({
+            files: [file],
+          });
+        } catch (shareError: any) {
+          if (shareError.name !== 'AbortError') {
+            console.error('Share error:', shareError);
+          }
+        }
+      } else if (isMobile) {
+        // Mobile but Web Share not fully supported - download and guide
+        const url = URL.createObjectURL(imageBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'justanote-story.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert('Image saved! 📸\n\nOpen Instagram → Tap + → Story → Select the image from your gallery');
+      } else {
+        // Desktop fallback
+        const url = URL.createObjectURL(imageBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'justanote-story.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert('Image saved! 📸\n\nSend it to your phone and upload to Instagram Story');
+      }
+    } catch (error) {
+      console.error('Failed to capture view:', error);
+      alert('Failed to create story. Please try again.');
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  };
+
+  // Generate story image from StoryCard
+  const generateStoryImage = async (action: 'download' | 'share') => {
+    if (!storyCardRef.current || !data) return;
+
+    setIsGeneratingStory(true);
+
+    try {
+      const canvas = await html2canvas(storyCardRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      });
+
+      const imageBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob!), 'image/png', 1.0);
+      });
+
+      const file = new File([imageBlob], 'justanote-story.png', { type: 'image/png' });
+
+      if (action === 'share') {
+        // Try to share
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file] });
+          } catch (shareError: any) {
+            if (shareError.name !== 'AbortError') {
+              console.error('Share error:', shareError);
+            }
+          }
+        } else {
+          // Fallback to download
+          const url = URL.createObjectURL(imageBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'justanote-story.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } else {
+        // Download
+        const url = URL.createObjectURL(imageBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'justanote-story.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Failed to generate story image:', error);
+      alert('Failed to create story. Please try again.');
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  };
+
   // Notify sender when recipient opens the dedication
   const notifySenderOfView = async () => {
     if (!id || id === 'demo' || hasNotifiedView) return;
-    
+
     try {
       // Record the view in Firebase
       await recordView(id);
-      
+
       // Get sender email and send notification
       const senderEmail = await getSenderEmail(id);
       if (senderEmail && data?.recipientName) {
         const viewLink = window.location.href;
         await sendViewedNotification(senderEmail, data.recipientName, viewLink);
       }
-      
+
       setHasNotifiedView(true);
     } catch (error) {
       console.error('Failed to notify sender:', error);
@@ -62,24 +248,31 @@ const ViewPage = () => {
   useEffect(() => {
     const loadDedication = async () => {
       setIsLoading(true);
-      
+
       if (id && id !== 'demo') {
         // First try Firebase (short IDs like "Abc123xy")
         if (id.length <= 12) {
-          const firebaseData = await getDedication(id);
+          // Extract actual ID if it accidentally contains query or hash
+          const cleanId = id.split('?')[0].split('#')[0];
+          console.log('Loading dedication with ID:', cleanId);
+
+          const firebaseData = await getDedication(cleanId);
+          console.log('Firebase data:', firebaseData);
+          
           if (firebaseData) {
+            // Use data directly - no encryption
             setData(firebaseData);
             setTheme(getThemeById(firebaseData.themeId));
             parseSongData(firebaseData);
             // Increment view count
-            incrementViews(id);
+            incrementViews(cleanId);
             setIsLoading(false);
             return;
           }
-          
+
           // Try localStorage backup for short IDs
           try {
-            const localData = localStorage.getItem(`dedication_${id}`);
+            const localData = localStorage.getItem(`dedication_${cleanId}`);
             if (localData) {
               const parsedData = JSON.parse(localData) as DedicationData;
               setData(parsedData);
@@ -92,7 +285,7 @@ const ViewPage = () => {
             console.warn('Could not read from localStorage:', e);
           }
         }
-        
+
         // Try base64 decode (legacy URLs)
         try {
           let base64 = id.replace(/-/g, '+').replace(/_/g, '/');
@@ -127,7 +320,7 @@ const ViewPage = () => {
           // Show error
         }
       }
-      
+
       if (id && id !== 'demo') {
         setLoadError(true);
       } else {
@@ -149,30 +342,30 @@ const ViewPage = () => {
       }
       setIsLoading(false);
     };
-    
+
     loadDedication();
   }, [id]);
 
   const handleOpen = () => {
     setStage('reveal');
-    
+
     // Notify sender that recipient opened the dedication
     notifySenderOfView();
-    
+
     setTimeout(() => {
       setShowFullMessage(true);
-      // Note: For YouTube songs, playback starts when the iframe loads with autoplay
-      // For legacy audio preview (if no YouTube), use audio element
-      if (songData?.preview && !songData.youtubeVideoId) {
+      // Note: Audio preview - iOS requires user interaction for play
+      if (songData?.preview && !songData.youtubeVideoId && !songData.videoId && songData.type !== 'youtube') {
         audioRef.current = new Audio(songData.preview);
         if (songData.startTime && songData.startTime > 0) {
           audioRef.current.currentTime = songData.startTime;
         }
-        audioRef.current.play();
+        // Try to play, but will fail on iOS without user interaction
+        audioRef.current.play().catch(() => {
+          // Autoplay failed, user needs to tap play
+          console.log('Autoplay prevented - user must interact');
+        });
         audioRef.current.onended = () => setIsPlaying(false);
-        setIsPlaying(true);
-      } else if (songData?.youtubeVideoId) {
-        // YouTube will autoplay via iframe
         setIsPlaying(true);
       }
     }, 800);
@@ -185,9 +378,9 @@ const ViewPage = () => {
       setIsPlaying(!isPlaying);
       return;
     }
-    
+
     if (!songData?.preview) return;
-    
+
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -225,7 +418,7 @@ const ViewPage = () => {
     if (url.includes('youtube.com/watch?v=') || url.includes('youtu.be/')) {
       let videoId = '';
       let startTime = 0;
-      
+
       if (url.includes('youtube.com/watch?v=')) {
         videoId = url.split('v=')[1]?.split('&')[0] || '';
         // Check for timestamp in URL
@@ -240,9 +433,9 @@ const ViewPage = () => {
           startTime = parseInt(timeMatch[1]);
         }
       }
-      
+
       if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}?start=${startTime}&autoplay=1`;
+        return `https://www.youtube.com/embed/${videoId}?start=${startTime}&playsinline=1`;
       }
     }
     return null;
@@ -295,7 +488,7 @@ const ViewPage = () => {
   const spotifyEmbed = songData?.url ? getSpotifyEmbedUrl(songData.url) : null;
   const youtubeEmbed = songData?.url ? getYouTubeEmbedUrl(songData.url) : null;
   const hasCustomSong = (songData?.videoId || songData?.youtubeVideoId || songData?.preview || songData?.type === 'spotify') && (songData?.title || songData?.type === 'youtube' || songData?.type === 'spotify');
-  
+
   // Generate Spotify embed URL from stored data
   const getSpotifyClipEmbed = () => {
     if (songData?.type === 'spotify' && songData?.trackId) {
@@ -303,32 +496,41 @@ const ViewPage = () => {
     }
     return null;
   };
-  
+
   // Generate YouTube embed URL from stored clip data
   const getYouTubeClipEmbed = () => {
     // New format: type: 'youtube' with videoId and startTime
     if (songData?.type === 'youtube' && songData?.videoId) {
       const start = songData.startTime || 0;
-      return `https://www.youtube.com/embed/${songData.videoId}?start=${start}&autoplay=1&modestbranding=1`;
+      return `https://www.youtube.com/embed/${songData.videoId}?start=${start}&modestbranding=1&playsinline=1`;
     }
     // Legacy format: youtubeVideoId
     if (songData?.youtubeVideoId) {
       const start = songData.youtubeStartTime || 0;
-      return `https://www.youtube.com/embed/${songData.youtubeVideoId}?start=${start}&autoplay=1&modestbranding=1`;
+      return `https://www.youtube.com/embed/${songData.youtubeVideoId}?start=${start}&modestbranding=1&playsinline=1`;
     }
     return null;
   };
-  
+
   const spotifyClipEmbed = getSpotifyClipEmbed();
   const youtubeClipEmbed = getYouTubeClipEmbed();
   const isYouTubeType = songData?.type === 'youtube' || songData?.youtubeVideoId;
   const isSpotifyType = songData?.type === 'spotify';
 
+  // Debug logging
+  console.log('Song Data:', songData);
+  console.log('Spotify Clip Embed:', spotifyClipEmbed);
+  console.log('Is Spotify Type:', isSpotifyType);
+  console.log('Has Custom Song:', hasCustomSong);
+
   return (
-    <div className={cn(
-      'min-h-screen transition-all duration-1000 overflow-hidden',
-      stage === 'intro' ? 'bg-gradient-to-br from-gray-900 via-purple-900 to-pink-900' : theme.bgClass
-    )}>
+    <div 
+      className={cn(
+        'min-h-screen transition-all duration-1000 overflow-hidden',
+        stage === 'intro' ? 'bg-gradient-to-br from-gray-900 via-purple-900 to-pink-900' : theme.bgClass
+      )}
+      data-dedication-view
+    >
       <AnimatePresence mode="wait">
         {stage === 'intro' ? (
           <motion.div
@@ -344,15 +546,15 @@ const ViewPage = () => {
                 <motion.div
                   key={i}
                   className="absolute w-2 h-2 bg-white/20 rounded-full"
-                  style={{ 
-                    left: `${Math.random() * 100}%`, 
-                    top: `${Math.random() * 100}%` 
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`
                   }}
-                  animate={{ 
+                  animate={{
                     y: [0, -100],
                     opacity: [0.2, 0]
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 3 + Math.random() * 2,
                     repeat: Infinity,
                     delay: Math.random() * 2
@@ -367,7 +569,7 @@ const ViewPage = () => {
 
             {/* Gift box animation */}
             <motion.div
-              animate={{ 
+              animate={{
                 y: [0, -15, 0],
                 rotateZ: [-2, 2, -2]
               }}
@@ -448,7 +650,7 @@ const ViewPage = () => {
             className="min-h-screen py-8 px-4 relative"
           >
             <FloatingHearts />
-            
+
             <div className="max-w-md mx-auto">
               {/* Photo Section - Top (Polaroid style) */}
               {data.photoUrl && (
@@ -502,17 +704,17 @@ const ViewPage = () => {
                 >
                   <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/50">
                     <p className="text-center text-gray-500 text-sm mb-4">🎵 A song for you 🎵</p>
-                    
-                    {(youtubeClipEmbed || isYouTubeType) ? (
+
+                    {(isSpotifyType || spotifyClipEmbed) ? (
                       <>
-                        {/* YouTube Clip Player */}
+                        {/* Spotify Clip Player */}
                         <div className="relative">
                           {/* Album art and info above the player (if available) */}
-                          {songData?.albumCover && (
+                          {songData?.title && songData?.albumCover && (
                             <div className="flex items-center gap-4 mb-4">
-                              <img 
-                                src={songData.albumCover} 
-                                alt={songData.title || 'Album'} 
+                              <img
+                                src={songData.albumCover}
+                                alt={songData.title || 'Album'}
                                 className="w-16 h-16 rounded-xl shadow-lg object-cover"
                               />
                               <div className="flex-1 min-w-0">
@@ -521,7 +723,47 @@ const ViewPage = () => {
                               </div>
                             </div>
                           )}
-                          
+
+                          {/* Spotify Player */}
+                          <div className="rounded-xl overflow-hidden">
+                            <iframe
+                              src={spotifyClipEmbed || spotifyEmbed || ''}
+                              width="100%"
+                              height="152"
+                              frameBorder="0"
+                              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                              loading="lazy"
+                              className="rounded-xl"
+                            />
+                          </div>
+
+                          {/* Note about Spotify */}
+                          {!songData?.title && (
+                            <p className="text-xs text-gray-400 text-center mt-2">
+                              🎵 Playing a Spotify track
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (youtubeClipEmbed || isYouTubeType) ? (
+                      <>
+                        {/* YouTube Clip Player */}
+                        <div className="relative">
+                          {/* Album art and info above the player (if available) */}
+                          {songData?.albumCover && (
+                            <div className="flex items-center gap-4 mb-4">
+                              <img
+                                src={songData.albumCover}
+                                alt={songData.title || 'Album'}
+                                className="w-16 h-16 rounded-xl shadow-lg object-cover"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-800 truncate">{songData?.title}</p>
+                                <p className="text-sm text-gray-500 truncate">{songData?.artist}</p>
+                              </div>
+                            </div>
+                          )}
+
                           {/* YouTube Player */}
                           <div className="rounded-xl overflow-hidden aspect-video bg-black relative">
                             <iframe
@@ -534,7 +776,7 @@ const ViewPage = () => {
                               className="rounded-xl"
                             />
                           </div>
-                          
+
                           {/* Music Visualizer Bars */}
                           <div className="flex items-end justify-center gap-1 mt-4 h-8">
                             {[...Array(12)].map((_, i) => (
@@ -569,7 +811,7 @@ const ViewPage = () => {
                               <div key={i} className={`absolute inset-${i} rounded-full border border-gray-700/30`} style={{ inset: `${i * 4}px` }} />
                             ))}
                             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-transparent" />
-                            
+
                             {/* Center - Album Art */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full shadow-inner overflow-hidden">
                               {songData?.albumCover ? (
@@ -623,18 +865,6 @@ const ViewPage = () => {
                           ))}
                         </div>
                       </>
-                    ) : (isSpotifyType || spotifyClipEmbed) ? (
-                      <div className="rounded-xl overflow-hidden">
-                        <iframe
-                          src={spotifyClipEmbed || spotifyEmbed || ''}
-                          width="100%"
-                          height="152"
-                          frameBorder="0"
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                          loading="lazy"
-                          className="rounded-xl"
-                        />
-                      </div>
                     ) : youtubeEmbed ? (
                       <div className="rounded-xl overflow-hidden aspect-video">
                         <iframe
@@ -655,10 +885,10 @@ const ViewPage = () => {
               {/* Message - Note Style */}
               <motion.div
                 initial={{ opacity: 0, y: 30, rotateZ: -2 }}
-                animate={{ 
-                  opacity: showFullMessage ? 1 : 0, 
-                  y: showFullMessage ? 0 : 30, 
-                  rotateZ: showFullMessage ? 1 : -2 
+                animate={{
+                  opacity: showFullMessage ? 1 : 0,
+                  y: showFullMessage ? 0 : 30,
+                  rotateZ: showFullMessage ? 1 : -2
                 }}
                 transition={{ delay: 0.7, type: "spring" }}
                 className="relative mb-8"
@@ -670,16 +900,16 @@ const ViewPage = () => {
                       <div key={i} className="border-b border-blue-200/30 h-7" />
                     ))}
                   </div>
-                  
+
                   {/* Red margin */}
                   <div className="absolute left-10 top-0 bottom-0 w-px bg-red-300/50" />
-                  
+
                   <div className="relative z-10">
                     <p className="text-gray-700 text-lg leading-relaxed pl-6 whitespace-pre-wrap">
                       "{data.message}"
                     </p>
                   </div>
-                  
+
                   {/* Pin */}
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-red-400 rounded-full shadow-lg border-2 border-red-300">
                     <div className="absolute top-1 left-1 w-2 h-2 bg-white/50 rounded-full" />
@@ -711,8 +941,35 @@ const ViewPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: showFullMessage ? 1 : 0, y: showFullMessage ? 0 : 20 }}
                 transition={{ delay: 1.2 }}
-                className="text-center pb-8"
+                className="text-center pb-8 px-4"
               >
+                {/* Add to Story Button */}
+                <motion.button
+                  onClick={captureAndShareView}
+                  disabled={isGeneratingStory}
+                  className={cn(
+                    "w-full mb-4 py-4 rounded-2xl font-semibold text-white shadow-lg flex items-center justify-center gap-2",
+                    "bg-gradient-to-r",
+                    theme.gradientClass,
+                    "hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all",
+                    "min-h-[56px]",
+                    "disabled:opacity-50"
+                  )}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isGeneratingStory ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-5 h-5" />
+                      Add to Story
+                    </>
+                  )}
+                </motion.button>
+                
                 <p className="text-gray-500 text-sm mb-4">Want to make someone's day too?</p>
                 <AnimatedButton
                   onClick={() => navigate('/create')}
@@ -725,6 +982,182 @@ const ViewPage = () => {
                 </AnimatedButton>
               </motion.div>
             </div>
+
+            {/* Story Modal */}
+            <AnimatePresence>
+              {showStoryModal && data && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                  onClick={() => setShowStoryModal(false)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="relative max-w-[400px] w-full"
+                  >
+                    {/* Close button */}
+                    <button
+                      onClick={() => setShowStoryModal(false)}
+                      className="absolute -top-12 right-0 text-white/80 hover:text-white p-2"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+
+                    {/* Story Preview */}
+                    <div className="rounded-3xl overflow-hidden shadow-2xl mb-4">
+                      <StoryCard
+                        ref={storyCardRef}
+                        data={data}
+                        theme={theme}
+                        songData={songData}
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <motion.button
+                        onClick={() => generateStoryImage('download')}
+                        disabled={isGeneratingStory}
+                        className="flex-1 py-3 px-4 bg-white rounded-xl font-semibold text-gray-800 shadow-lg flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50 transition-all"
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {isGeneratingStory ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Download className="w-5 h-5" />
+                            Save
+                          </>
+                        )}
+                      </motion.button>
+                      
+                      <motion.button
+                        onClick={() => generateStoryImage('share')}
+                        disabled={isGeneratingStory}
+                        className={cn(
+                          "flex-1 py-3 px-4 rounded-xl font-semibold text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 transition-all",
+                          "bg-gradient-to-r",
+                          theme.gradientClass
+                        )}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {isGeneratingStory ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Share2 className="w-5 h-5" />
+                            Share
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
+
+                    {/* Instagram Share Button - Direct to Story */}
+                    <motion.button
+                      onClick={async () => {
+                        if (!storyCardRef.current || !data) return;
+                        
+                        setIsGeneratingStory(true);
+                        
+                        try {
+                          // Generate the image
+                          const canvas = await html2canvas(storyCardRef.current, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: null,
+                          });
+                          
+                          const imageBlob = await new Promise<Blob>((resolve) => {
+                            canvas.toBlob((blob) => resolve(blob!), 'image/png', 1.0);
+                          });
+                          
+                          // Create file for sharing
+                          const file = new File([imageBlob], 'justanote-story.png', { type: 'image/png' });
+                          
+                          // Check if we're on mobile
+                          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                          
+                          // Check if Web Share API with files is supported (mobile)
+                          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                            try {
+                              // Use native share - this opens share sheet where user can select Instagram
+                              await navigator.share({
+                                files: [file],
+                              });
+                              // Success! User shared or cancelled
+                            } catch (shareError: any) {
+                              // User cancelled or share failed
+                              if (shareError.name !== 'AbortError') {
+                                console.error('Share error:', shareError);
+                              }
+                            }
+                          } else if (isMobile) {
+                            // Mobile but Web Share not fully supported - download and guide
+                            const url = URL.createObjectURL(imageBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'justanote-story.png';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            
+                            alert('Image saved to your gallery! 📸\n\nNow open Instagram → Tap + → Story → Select the image from your gallery');
+                          } else {
+                            // Desktop fallback: Download the image and show instructions
+                            const url = URL.createObjectURL(imageBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'justanote-story.png';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            
+                            alert('Image saved! 📸\n\nTo share to Instagram Story:\n1. Send this image to your phone\n2. Open Instagram → + → Story\n3. Select the image\n\nOr open this page on your phone for easy sharing! 📱');
+                          }
+                        } catch (error) {
+                          console.error('Share failed:', error);
+                          // Fallback to just generating
+                          await generateStoryImage('download');
+                        } finally {
+                          setIsGeneratingStory(false);
+                        }
+                      }}
+                      disabled={isGeneratingStory}
+                      className="w-full mt-3 py-4 px-4 rounded-xl font-semibold text-white shadow-lg flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
+                      style={{
+                        background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isGeneratingStory ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                          </svg>
+                          Share to Instagram Story
+                        </>
+                      )}
+                    </motion.button>
+
+                    <p className="text-center text-white/60 text-xs mt-3">
+                      {/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) 
+                        ? 'Tap to share directly to your Instagram Story!'
+                        : 'Download the image, then upload to Instagram Story 📸'}
+                    </p>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

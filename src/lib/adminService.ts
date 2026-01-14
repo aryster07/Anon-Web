@@ -25,6 +25,11 @@ export interface DeliveryRequest {
   viewedAt: Timestamp | null;
   viewCount: number;
   deliveryMethod?: string;
+  shareKey?: string;
+  encryptedLogistics?: {
+    senderEmail: string;
+    recipientInstagram: string;
+  } | null;
 }
 
 const DEDICATIONS_COLLECTION = 'dedications';
@@ -85,6 +90,9 @@ export async function getAllDeliveryRequests(): Promise<DeliveryRequest[]> {
         deliveredAt: doc.data().deliveredAt || null,
         viewedAt: doc.data().viewedAt || null,
         viewCount: doc.data().viewCount || 0,
+        shareKey: doc.data().shareKey || '',
+        // Include encrypted logistics for admin decryption
+        encryptedLogistics: doc.data().encryptedLogistics || null,
       }));
     } catch (indexError: any) {
       // If index doesn't exist, fall back to simpler query
@@ -109,6 +117,9 @@ export async function getAllDeliveryRequests(): Promise<DeliveryRequest[]> {
         deliveredAt: doc.data().deliveredAt || null,
         viewedAt: doc.data().viewedAt || null,
         viewCount: doc.data().viewCount || 0,
+        shareKey: doc.data().shareKey || '',
+        // Include encrypted logistics for admin decryption
+        encryptedLogistics: doc.data().encryptedLogistics || null,
       }));
       
       // Sort client-side

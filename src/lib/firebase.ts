@@ -43,12 +43,8 @@ const getAuthInstance = (): Auth => {
 // Export db for direct access
 export const db = getDb();
 
-// Export auth with lazy initialization
-export const auth: Auth = new Proxy({} as Auth, {
-  get(_, prop) {
-    return getAuthInstance()[prop as keyof Auth];
-  }
-});
+// Export auth directly (not as proxy to avoid issues with Firebase listeners)
+export const auth: Auth = getAuthInstance();
 
 // Generate a short, unique ID
 const generateId = (): string => {

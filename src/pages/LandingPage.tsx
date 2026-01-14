@@ -16,20 +16,27 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-anon-dark text-white relative overflow-hidden">
       <FloatingHearts />
-      
+
       {/* Gradient orbs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-anon-pink/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-anon-orange/20 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 container max-w-4xl mx-auto px-4 py-12 min-h-screen flex flex-col items-center justify-center">
+        {/* Credits - Moved to top */}
+
+
         {/* Logo */}
         <motion.div
           initial={{ scale: 0, rotate: -180 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', duration: 0.8 }}
-          className="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center mb-8 shadow-xl anon-glow"
+          className="w-24 h-24 mb-8 rounded-full shadow-2xl anon-glow overflow-hidden bg-black relative"
         >
-          <Heart className="w-8 h-8 text-white fill-white" />
+          <img
+            src="/logo.png"
+            alt="Just a note Logo"
+            className="w-full h-full object-cover scale-110"
+          />
         </motion.div>
 
         {/* Badge */}
@@ -61,7 +68,7 @@ const LandingPage = () => {
           transition={{ delay: 0.4 }}
           className="text-lg md:text-xl text-white/60 text-center max-w-xl mb-10"
         >
-          Create beautiful dedications with music, photos, and heartfelt messages. 
+          Create beautiful dedications with music, photos, and heartfelt messages.
           Share them anonymously or reveal yourself.
         </motion.p>
 
@@ -77,9 +84,13 @@ const LandingPage = () => {
             onClick={() => navigate('/create')}
             className="group"
           >
-            Create a Dedication
+            Create a Note
             <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
           </AnimatedButton>
+
+          <p className="text-xs text-white/30 mt-4 text-center">
+            Made with 💛 by 7Frames_aryan
+          </p>
         </motion.div>
 
         {/* Feature Pills */}
@@ -108,10 +119,12 @@ const LandingPage = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="absolute bottom-8 text-sm text-white/30"
+          className="absolute bottom-4 text-xs text-white/20"
         >
-          Made with 💕 by Anon
+          just a note mj
         </motion.p>
+
+
       </div>
     </div>
   );

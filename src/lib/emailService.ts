@@ -1,7 +1,7 @@
 // Email service using EmailJS (free, no backend required)
 // Sign up at https://www.emailjs.com/ and get your keys
 
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'YOUR_SERVICE_ID';
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_46vg54o';
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_PUBLIC_KEY';
 const EMAILJS_DELIVERED_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_DELIVERED_TEMPLATE || 'YOUR_DELIVERED_TEMPLATE';
 const EMAILJS_VIEWED_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_VIEWED_TEMPLATE || 'YOUR_VIEWED_TEMPLATE';
@@ -46,17 +46,22 @@ async function sendEmail(templateId: string, params: EmailParams): Promise<boole
 
 /**
  * Send notification to sender that their dedication was delivered to the recipient
+ * Note: recipientName may be a generic placeholder if encrypted
  */
 export async function sendDeliveredNotification(
   senderEmail: string,
   recipientName: string,
   recipientInstagram: string
 ): Promise<boolean> {
+  const instagramHandle = recipientInstagram ? `@${recipientInstagram.replace('@', '')}` : '';
   return sendEmail(EMAILJS_DELIVERED_TEMPLATE_ID, {
     to_email: senderEmail,
     recipient_name: recipientName,
-    recipient_instagram: recipientInstagram ? `@${recipientInstagram.replace('@', '')}` : '',
-    subject: `Your heartfelt note to ${recipientName} has been delivered! 💌`,
+    recipient_instagram: instagramHandle,
+    subject: `Your heartfelt note has been delivered! 💌`,
+    message: instagramHandle 
+      ? `Great news! Your heartfelt note has been delivered to ${instagramHandle} via Instagram DM. They can now view your special message! 💕`
+      : `Great news! Your heartfelt note has been delivered. They can now view your special message! 💕`,
   });
 }
 

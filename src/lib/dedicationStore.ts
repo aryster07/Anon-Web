@@ -32,6 +32,12 @@ export interface DedicationData {
   deliveryMethod: 'self' | 'deliver';
   recipientInstagram: string;
   senderEmail: string;
+  encryptedContent?: string;
+  encryptedLogistics?: {
+    senderEmail: string;
+    recipientName: string;
+    recipientInstagram: string;
+  };
 }
 
 interface DedicationStore {

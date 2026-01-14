@@ -29,23 +29,38 @@ const StepComplete = () => {
       console.log('Saving dedication with deliveryMethod:', data.deliveryMethod);
       try {
         setIsLoading(true);
-        const id = await saveDedication(data);
+
+        // Save all data in plain text (no encryption)
+        const id = await saveDedication({
+          deliveryMethod: data.deliveryMethod,
+          themeId: data.themeId,
+          message: data.message,
+          photoUrl: data.photoUrl,
+          songUrl: data.songUrl,
+          songData: data.songData,
+          senderName: data.senderName,
+          recipientName: data.recipientName,
+          senderEmail: data.senderEmail,
+          recipientInstagram: data.recipientInstagram,
+          isAnonymous: data.isAnonymous,
+        });
+
         console.log('Saved dedication with ID:', id);
+
+        // No key in URL - decryption happens automatically using shareKey from Firebase
         setDedicationId(id);
+
         // Try to store in sessionStorage (may fail if photo is too large)
         try {
-          // Store a minimal version without the photo for sessionStorage
-          const minimalData = { ...data, photoUrl: data.photoUrl ? 'HAS_PHOTO' : null };
-          sessionStorage.setItem('dedication', JSON.stringify(minimalData));
-          // Store full data reference by ID
-          sessionStorage.setItem(`dedication_${id}`, JSON.stringify(data));
+          // Store just the basics
+          sessionStorage.setItem('dedication', JSON.stringify({ ...data, photoUrl: null }));
         } catch (storageErr) {
-          console.warn('Could not save to sessionStorage (quota exceeded):', storageErr);
+          console.warn('Storage error', storageErr);
         }
       } catch (err) {
         console.error('Error saving dedication:', err);
         setError('Failed to save. Please try again.');
-        // Fallback to base64 encoding (without photo to avoid quota issues)
+        // Fallback to base64 encoding (legacy mode)
         const dataWithoutPhoto = { ...data, photoUrl: null };
         const fallbackId = btoa(JSON.stringify(dataWithoutPhoto))
           .replace(/\+/g, '-')
@@ -56,7 +71,7 @@ const StepComplete = () => {
         setIsLoading(false);
       }
     };
-    
+
     saveToFirebase();
   }, [data]);
 
@@ -65,7 +80,7 @@ const StepComplete = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const shareUrl = dedicationId 
+  const shareUrl = dedicationId
     ? `${window.location.origin}/view/${dedicationId}`
     : '';
 
@@ -106,8 +121,8 @@ const StepComplete = () => {
       </motion.div>
 
       <h1 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-2">
-        {data.deliveryMethod === 'deliver' 
-          ? "We've got it from here! 💌" 
+        {data.deliveryMethod === 'deliver'
+          ? "We've got it from here! 💌"
           : "Your dedication is ready!"}
       </h1>
       <p className="text-muted-foreground text-center mb-8">
@@ -125,9 +140,9 @@ const StepComplete = () => {
       >
         <div className="flex items-center gap-3 mb-4">
           {data.photoUrl ? (
-            <img 
-              src={data.photoUrl} 
-              alt="Uploaded" 
+            <img
+              src={data.photoUrl}
+              alt="Uploaded"
               className="w-10 h-10 rounded-xl object-cover"
             />
           ) : (
@@ -177,7 +192,7 @@ const StepComplete = () => {
                 <p className="text-sm text-muted-foreground">We'll handle it from here</p>
               </div>
             </div>
-            
+
             <div className="space-y-3 mb-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="w-4 h-4 text-pink-500" />

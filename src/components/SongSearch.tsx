@@ -79,16 +79,20 @@ const SongSearch = ({ onSelectSong, selectedSong, onClear }: SongSearchProps) =>
     };
   }, [query]);
 
-  // Click outside to close
+  // Click/touch outside to close - improved for mobile
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowResults(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Setup preview audio when song is selected
@@ -309,18 +313,22 @@ const SongSearch = ({ onSelectSong, selectedSong, onClear }: SongSearchProps) =>
         <>
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setShowResults(true)}
               placeholder="Search for a song..."
-              className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+              className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors text-base"
               aria-label="Search for a song"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
             />
             {isSearching && (
-              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-pink-400 animate-spin" />
+              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-pink-400 animate-spin pointer-events-none" />
             )}
           </div>
 
@@ -331,7 +339,10 @@ const SongSearch = ({ onSelectSong, selectedSong, onClear }: SongSearchProps) =>
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-96 overflow-y-auto"
+                className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] max-h-[60vh] sm:max-h-96 overflow-y-auto"
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                }}
               >
                 {/* Header */}
                 {!query.trim() && popularSongs.length > 0 && (

@@ -1,53 +1,91 @@
-# Welcome to your Lovable project
+# Just A Note - Anonymous Dedication Platform
 
-## Project info
+A beautiful web application for creating and sharing anonymous dedications with music, photos, and heartfelt messages.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- 🎵 **Music Integration** - Add songs from YouTube or Spotify
+- 🎨 **7 Beautiful Themes** - Crush, Partner, Friend, Best Friend, Parents, Teacher, and Appreciation
+- 📸 **Photo Upload** - Add personal photos to your dedications
+- 👻 **100% Anonymous** - Option to send dedications anonymously
+- 💌 **Direct Delivery** - Self-delivery or submit for Instagram DM delivery
+- 📧 **Email Notifications** - Get notified when your dedication is viewed
+- 📱 **Share to Instagram Stories** - Beautiful story cards optimized for Instagram
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Animations**: Framer Motion
+- **Backend**: Firebase (Firestore + Authentication)
+- **Email**: EmailJS
+- **Deployment**: Firebase Hosting
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone https://github.com/aryster07/Anon-Web.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to project directory
+cd Anon-Web
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create a `.env` file in the root directory with your Firebase and EmailJS credentials:
 
-**Use GitHub Codespaces**
+```env
+VITE_EMAILJS_SERVICE_ID=your_service_id
+VITE_EMAILJS_TEMPLATE_ID=your_template_id
+VITE_EMAILJS_PUBLIC_KEY=your_public_key
+VITE_EMAILJS_VIEWED_TEMPLATE_ID=your_viewed_template_id
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
+## Build for Production
+
+```sh
+npm run build
+```
+
+## Deploy to Firebase
+
+```sh
+firebase deploy
+```
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+│   ├── steps/       # Multi-step form components
+│   └── ui/          # shadcn/ui components
+├── lib/             # Utilities and services
+│   ├── firebase.ts  # Firebase configuration
+│   ├── themes.ts    # Theme definitions
+│   └── ...
+├── pages/           # Route pages
+│   ├── LandingPage.tsx
+│   ├── CreatePage.tsx
+│   ├── ViewPage.tsx
+│   └── ...
+└── App.tsx          # Main app component
+```
+
+## License
+
+MIT
+
+## Credits
+
+Made with 💛 by 7Frames_aryan
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?
