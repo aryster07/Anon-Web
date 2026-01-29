@@ -1,18 +1,17 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, serverTimestamp, Firestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 import { getAuth, Auth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 import { NoteData } from './types';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDvdB4VUE7UHfN4xoyz6trRQKyAgdRKC1I",
-  authDomain: "anony-fc294.firebaseapp.com",
-  projectId: "anony-fc294",
-  storageBucket: "anony-fc294.firebasestorage.app",
-  messagingSenderId: "280220039436",
-  appId: "1:280220039436:web:6e24e3ac33d03b7324f129",
-  measurementId: "G-Q3B821DVJS"
+  apiKey: "AIzaSyDPidzFR2-qWQMe8e_gZBREDvRPfJT3foA",
+  authDomain: "justanote-245f2.firebaseapp.com",
+  projectId: "justanote-245f2",
+  storageBucket: "justanote-245f2.firebasestorage.app",
+  messagingSenderId: "176743103646",
+  appId: "1:176743103646:web:3cb14b571ff9a45f214f8f",
+  measurementId: "G-28PQX14TEL"
 };
 
 // Lazy initialization
@@ -43,7 +42,6 @@ const getAuthInstance = (): Auth => {
 
 // Export instances
 export const db = getDb();
-export const storage = getStorage(getApp());
 export const auth: Auth = getAuthInstance();
 export const analytics = getAnalytics(getApp());
 

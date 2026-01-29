@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow anyone to read files
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+    
+    // Allow authenticated and unauthenticated users to write to notes folder
+    match /notes/{fileName} {
+      allow write: if true;
+      allow read: if true;
+    }
+    
+    // Allow all uploads for now (you can add auth later)
+    match /{allPaths=**} {
+      allow write: if true;
+    }
+  }
+}

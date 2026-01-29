@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { NoteData, Vibe } from '../types';
 import { BackButton, StepIndicator, SongPlayer, PrimaryButton } from '../components/UI';
 import { ArrowRight, Search, Edit2, Check, Play, Image as ImageIcon, Sparkles, X, Loader2 } from 'lucide-react';
-import { storage, saveNote } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { saveNote } from '../firebase';
 
 interface Props {
   data: NoteData;
@@ -23,7 +22,7 @@ const VIBES: Vibe[] = [
 export const RecipientTheme = ({ data, updateData }: Props) => {
   const navigate = useNavigate();
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-screen relative">
       <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pt-4 md:pt-8 pb-2">
         <StepIndicator step={2} total={8} label="25%" />
       </div>
@@ -79,11 +78,13 @@ export const RecipientTheme = ({ data, updateData }: Props) => {
           </div>
         </section>
       </main>
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pt-12">
-        <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-          <PrimaryButton onClick={() => navigate('/create/song')} icon={ArrowRight}>Next Step</PrimaryButton>
+      {data.recipientName.trim() && data.vibe && (
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pt-12">
+          <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+            <PrimaryButton onClick={() => navigate('/create/song')} icon={ArrowRight}>Next Step</PrimaryButton>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -224,7 +225,7 @@ export const SelectSong = ({ data, updateData }: Props) => {
 
   if (showClipSelector && tempMusicSource) {
     return (
-      <div className="flex flex-col h-full bg-surface-light relative">
+      <div className="flex flex-col h-screen bg-surface-light relative">
         <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pt-4 md:pt-8">
           <button onClick={() => setShowClipSelector(false)} className="flex items-center gap-2 text-slate-600 hover:text-royal-gold mb-4">
             <ArrowRight size={20} className="rotate-180" />
@@ -298,7 +299,7 @@ export const SelectSong = ({ data, updateData }: Props) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface-light relative">
+    <div className="flex flex-col h-screen bg-surface-light relative">
       <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pt-4 md:pt-8 pb-2">
         <StepIndicator step={3} total={8} label="38%" />
       </div>
@@ -474,9 +475,9 @@ export const SelectSong = ({ data, updateData }: Props) => {
         </main>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 z-30 p-6 pb-8 pt-12 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 flex flex-col gap-4">
-          {data.song && (
+      {data.song && (
+        <div className="absolute bottom-0 left-0 right-0 z-30 p-6 pb-8 pt-12 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 flex flex-col gap-4">
             <div className="animate-in slide-in-from-bottom-5 fade-in duration-300">
               <SongPlayer 
                 song={data.song} 
@@ -484,16 +485,15 @@ export const SelectSong = ({ data, updateData }: Props) => {
                 onToggle={() => data.song && data.songData?.preview && togglePlay(data.song.id?.toString(), data.songData.preview)} 
               />
             </div>
-          )}
-          <PrimaryButton 
-            onClick={() => navigate('/create/message')} 
-            icon={ArrowRight}
-            disabled={!data.song}
-          >
-            Next Step
-          </PrimaryButton>
+            <PrimaryButton 
+              onClick={() => navigate('/create/message')} 
+              icon={ArrowRight}
+            >
+              Next Step
+            </PrimaryButton>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -525,7 +525,7 @@ export const ComposeMessage = ({ data, updateData }: Props) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface-light relative">
+    <div className="flex flex-col h-screen bg-surface-light relative">
       <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pt-4 md:pt-8 pb-2">
         <StepIndicator step={5} total={8} label="Message & Photo" />
       </div>
@@ -593,11 +593,13 @@ export const ComposeMessage = ({ data, updateData }: Props) => {
           </div>
         </div>
       </main>
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pt-12">
-        <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-          <PrimaryButton onClick={() => navigate('/create/delivery')} icon={ArrowRight}>Next Step</PrimaryButton>
+      {data.message.trim() && (
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pt-12">
+          <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+            <PrimaryButton onClick={() => navigate('/create/delivery')} icon={ArrowRight}>Next Step</PrimaryButton>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -606,16 +608,46 @@ export const DeliverySettings = ({ data, updateData }: Props) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
+  // Compress image to fit Firestore 1MB limit
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions (max 400px for small preview)
+        let { width, height } = img;
+        const maxDim = 400;
+        if (width > height && width > maxDim) {
+          height = (height * maxDim) / width;
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = (width * maxDim) / height;
+          height = maxDim;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to 20% quality (80% compression)
+        const result = canvas.toDataURL('image/jpeg', 0.2);
+        resolve(result);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
       let photoUrl = '';
 
+      // Compress photo if present
       if (data.photo) {
-        const timestamp = Date.now();
-        const photoRef = ref(storage, `notes/${timestamp}_${data.photo.name}`);
-        await uploadBytes(photoRef, data.photo);
-        photoUrl = await getDownloadURL(photoRef);
+        photoUrl = await compressImage(data.photo);
       }
 
       const noteId = await saveNote({
@@ -634,7 +666,7 @@ export const DeliverySettings = ({ data, updateData }: Props) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface-light relative">
+    <div className="flex flex-col h-screen bg-surface-light relative">
       <div className="w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pt-4 md:pt-8 pb-2">
         <StepIndicator step={7} total={8} label="Delivery" />
       </div>
@@ -769,7 +801,7 @@ export const Success = ({ data }: Props) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface-light relative">
+    <div className="flex flex-col h-screen bg-surface-light relative">
       <main className="flex-1 overflow-y-auto no-scrollbar w-full max-w-4xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 pb-32">
         <div className="py-12 text-center">
           <div className="text-6xl mb-6">🎉</div>
