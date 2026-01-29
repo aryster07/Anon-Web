@@ -1,0 +1,64 @@
+/* Custom styles */
+
+/* Gold gradient utilities */
+.gold-text-gradient {
+  background: linear-gradient(135deg, #d4af37, #f5d060, #c9a227);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #d4af37, #f5d060, #c9a227);
+}
+
+.shadow-gold-glow {
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Base styles */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom focus states */
+input:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+
+/* Safe area padding for mobile */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 1.5rem);
+}
