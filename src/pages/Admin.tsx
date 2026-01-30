@@ -127,14 +127,6 @@ export default function Admin() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
 
-  // Check if current domain needs to use redirect
-  const isCustomDomain = () => {
-    const hostname = window.location.hostname;
-    return hostname.includes('justanote.me') || 
-           hostname === 'www.justanote.me' || 
-           hostname === 'justanote.me';
-  };
-
   // Handle Google Sign In
   const handleGoogleSignIn = async () => {
     setError('');
@@ -146,13 +138,13 @@ export default function Admin() {
         prompt: 'select_account'
       });
       
-      // Use redirect on mobile devices or custom domains (popup often fails)
-      if (isMobile() || isCustomDomain()) {
+      // Use redirect ONLY on mobile devices, popup on desktop (including custom domains)
+      if (isMobile()) {
         await signInWithRedirect(auth, provider);
         return;
       }
       
-      // Use popup on desktop
+      // Use popup on desktop (works better, stays in same session)
       const result = await signInWithPopup(auth, provider);
       
       if (!ALLOWED_ADMINS.includes(result.user.email || '')) {
