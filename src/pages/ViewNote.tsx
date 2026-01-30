@@ -48,27 +48,41 @@ const ViewNote: React.FC = () => {
     if (!note || loading) return;
     
     const previewUrl = note.songData?.preview || note.song?.preview;
-    if (previewUrl && !audioRef.current) {
-      // Small delay to let the page render first
-      const timer = setTimeout(() => {
-        audioRef.current = new Audio(previewUrl);
-        audioRef.current.ontimeupdate = () => {
-          if (audioRef.current) {
-            setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
-          }
-        };
-        audioRef.current.onended = () => setIsPlaying(false);
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch((err) => {
-          // Autoplay might be blocked by browser, that's okay
-          console.log('Autoplay blocked:', err.message);
-        });
-      }, 500);
-      
-      return () => clearTimeout(timer);
+    if (!previewUrl) return;
+    
+    // Stop any existing audio first
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
-  }, [note, loading]);
+    
+    // Small delay to let the page render first
+    const timer = setTimeout(() => {
+      const audio = new Audio(previewUrl);
+      audioRef.current = audio;
+      
+      audio.ontimeupdate = () => {
+        if (audioRef.current) {
+          setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+        }
+      };
+      audio.onended = () => setIsPlaying(false);
+      
+      audio.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        // Autoplay might be blocked by browser, that's okay
+        console.log('Autoplay blocked:', err.message);
+      });
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, [note?.id]);
 
   // Check if audio playback is available (iTunes songs have preview)
   const hasAudioPreview = note?.songData?.preview || note?.song?.preview;

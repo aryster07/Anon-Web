@@ -23,7 +23,11 @@ const Landing: React.FC = () => {
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
         <div className="text-center max-w-md">
-          <div className="text-6xl mb-6">💌</div>
+          <img 
+            src="/logo.png" 
+            alt="Just A Note" 
+            className="w-24 h-24 mx-auto mb-6 object-contain"
+          />
           <h1 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 mb-4">
             Just A <span className="gold-text-gradient">Note</span>
           </h1>
@@ -47,7 +51,15 @@ const Landing: React.FC = () => {
 
       {/* Footer */}
       <footer className="p-6 text-center text-xs text-slate-400">
-        Made with ❤️
+        Made with <span className="text-royal-gold">💛</span> by{' '}
+        <a 
+          href="https://instagram.com/7frames_aryan" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-royal-gold hover:underline"
+        >
+          7frames_aryan
+        </a>
       </footer>
     </div>
   );

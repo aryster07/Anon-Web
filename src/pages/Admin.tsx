@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
+import emailjs from '@emailjs/browser';
+import { db, auth } from '../config/firebase';
 import { NoteData, VIBES } from '../types';
 import { 
   Lock, 
@@ -10,7 +12,7 @@ import {
   CheckCircle, 
   Clock, 
   Music, 
-  User, 
+  User as UserIcon, 
   Heart,
   RefreshCw,
   ExternalLink,
@@ -19,7 +21,8 @@ import {
   AlertCircle,
   TrendingUp,
   Send,
-  Calendar
+  Calendar,
+  LogOut
 } from 'lucide-react';
 
 interface Note extends NoteData {
@@ -35,9 +38,16 @@ interface Stats {
   todayCreated: number;
 }
 
+// Allowed admin emails
+const ALLOWED_ADMINS = [
+  'aryanrana762@gmail.com',
+  'justanote07@gmail.com'
+];
+
 export default function Admin() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,27 +55,60 @@ export default function Admin() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, delivered: 0, todayCreated: 0 });
 
-  // Admin password - in production, use environment variable
-  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_SECRET || 'justanote2024';
+  // EmailJS configuration
+  const EMAILJS_SERVICE_ID = 'service_h5xg96d';
+  const EMAILJS_TEMPLATE_ID = 'template_bs0eycc';
+  const EMAILJS_PUBLIC_KEY = 'H-Ra201ag7dDMUXiunF2x';
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      setError('');
-      sessionStorage.setItem('adminAuth', 'true');
-    } else {
-      setError('Invalid password');
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser && ALLOWED_ADMINS.includes(currentUser.email || '')) {
+        setIsAuthorized(true);
+      } else {
+        setIsAuthorized(false);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Handle Google Sign In
+  const handleGoogleSignIn = async () => {
+    setError('');
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      
+      if (!ALLOWED_ADMINS.includes(result.user.email || '')) {
+        await signOut(auth);
+        setError('Access denied. This email is not authorized.');
+      }
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError('Failed to sign in. Please try again.');
+      }
     }
   };
 
-  // Check for existing session
-  useEffect(() => {
-    const auth = sessionStorage.getItem('adminAuth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
+  // Handle Sign Out
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Sign out error:', err);
     }
-  }, []);
+  };
+
+  // Fetch notes when authorized
+  useEffect(() => {
+    if (isAuthorized) {
+      fetchNotes();
+    }
+  }, [isAuthorized]);
 
   // Fetch notes
   const fetchNotes = async () => {
@@ -109,20 +152,43 @@ export default function Admin() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchNotes();
-    }
-  }, [isAuthenticated]);
-
-  // Mark as delivered
+  // Mark as delivered and send email confirmation
   const markAsDelivered = async (noteId: string) => {
     try {
+      const note = notes.find(n => n.id === noteId);
+      
       const docRef = doc(db, 'notes', noteId);
       await updateDoc(docRef, {
         status: 'delivered',
         deliveredAt: serverTimestamp()
       });
+      
+      // Send email confirmation to sender if they provided email
+      if (note?.senderEmail) {
+        const noteLink = `${window.location.origin}/note/${noteId}`;
+        const vibe = getVibe(note.vibe || '1');
+        
+        try {
+          await emailjs.send(
+            EMAILJS_SERVICE_ID,
+            EMAILJS_TEMPLATE_ID,
+            {
+              to_email: note.senderEmail,
+              sender_name: note.isAnonymous ? 'Anonymous Sender' : (note.senderName || 'Someone special'),
+              recipient_name: note.recipientName,
+              note_link: noteLink,
+              vibe_emoji: vibe.emoji,
+              vibe_label: vibe.label,
+              message_preview: note.message ? (note.message.length > 100 ? note.message.substring(0, 100) + '...' : note.message) : 'No message',
+            },
+            EMAILJS_PUBLIC_KEY
+          );
+          console.log('Email sent successfully to:', note.senderEmail);
+        } catch (emailErr) {
+          console.error('Failed to send email:', emailErr);
+          // Don't block the delivery status update if email fails
+        }
+      }
       
       // Update local state
       setNotes(prev => prev.map(n => 
@@ -171,8 +237,17 @@ export default function Admin() {
     return n.status === filter;
   });
 
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-rose-400 animate-spin" />
+      </div>
+    );
+  }
+
   // Login screen
-  if (!isAuthenticated) {
+  if (!user || !isAuthorized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
@@ -182,33 +257,32 @@ export default function Admin() {
                 <Lock className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Admin Access</h1>
-              <p className="text-gray-500 mt-2">Enter password to continue</p>
+              <p className="text-gray-500 mt-2">Sign in with authorized Google account</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 outline-none transition-all"
-                autoFocus
-              />
-              
-              {error && (
-                <div className="flex items-center gap-2 text-red-500 text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {error}
-                </div>
-              )}
-              
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-medium rounded-xl hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg shadow-rose-200"
-              >
-                Login
-              </button>
-            </form>
+            {error && (
+              <div className="flex items-center gap-2 text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full py-3 bg-white border-2 border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-3"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Sign in with Google
+            </button>
+
+            <p className="text-xs text-gray-400 text-center mt-6">
+              Only authorized emails can access admin panel
+            </p>
           </div>
         </div>
       </div>
@@ -227,18 +301,27 @@ export default function Admin() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">Just A Note</h1>
-              <p className="text-sm text-gray-500">Admin Dashboard</p>
+              <p className="text-sm text-gray-500">Welcome, {user.displayName || user.email}</p>
             </div>
           </div>
           
-          <button
-            onClick={fetchNotes}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchNotes}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
@@ -365,7 +448,7 @@ export default function Admin() {
                       {/* Sender Info */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <User className="w-4 h-4" />
+                          <UserIcon className="w-4 h-4" />
                           <span>
                             {note.isAnonymous ? 'Anonymous' : note.senderName || 'Not provided'}
                           </span>

@@ -6,7 +6,27 @@
     <meta name="theme-color" content="#C5A059" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Just A Note - Royal Gold</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    
+    <!-- Open Graph / WhatsApp / Instagram -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Just A Note - Send Beautiful Notes" />
+    <meta property="og:description" content="Send beautiful, personalized notes with music, photos & heartfelt messages to the people you care about" />
+    <meta property="og:image" content="https://justanote.me/banner.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://justanote.me" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Just A Note - Send Beautiful Notes" />
+    <meta name="twitter:description" content="Send beautiful, personalized notes with music, photos & heartfelt messages" />
+    <meta name="twitter:image" content="https://justanote.me/banner.png" />
+    
+    <title>Just A Note</title>
     <link href="https://fonts.googleapis.com" rel="preconnect" />
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&amp;display=swap" rel="stylesheet" />
@@ -70,10 +90,23 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         touch-action: manipulation;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
       
-      input, textarea, button {
+      /* Allow text selection only in input fields */
+      input, textarea {
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
         font-size: 16px; /* Prevents zoom on iOS */
+      }
+      
+      button {
+        font-size: 16px;
       }
       
       @media (max-width: 640px) {

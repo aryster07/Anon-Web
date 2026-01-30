@@ -52,7 +52,7 @@ export const compressImage = (file: File): Promise<string> => {
     img.onload = () => {
       try {
         let { width, height } = img;
-        const maxDim = 400;
+        const maxDim = 800;
         
         if (width > height && width > maxDim) {
           height = (height * maxDim) / width;
@@ -66,7 +66,7 @@ export const compressImage = (file: File): Promise<string> => {
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
         
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.2);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         URL.revokeObjectURL(objectUrl);
         resolve(dataUrl);
       } catch (error) {

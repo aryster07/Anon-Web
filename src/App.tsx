@@ -101,17 +101,31 @@ const CreateFlowWrapper: React.FC = () => {
 const SuccessWrapper: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { noteData, resetNoteData } = useNoteContext();
+  
+  // Store the delivery data before reset
+  const [savedData, setSavedData] = useState<typeof noteData | null>(null);
 
-  // Reset note data when success page loads (note is saved)
   useEffect(() => {
-    // Use the id from URL but keep delivery method from saved note
-    const timer = setTimeout(() => {
-      resetNoteData();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    // Save the current note data before resetting
+    if (!savedData && noteData.recipientName) {
+      setSavedData({ ...noteData, id });
+    }
+  }, [noteData, id, savedData]);
 
-  return <SuccessPage data={{ ...noteData, id }} />;
+  // Reset note data after saving
+  useEffect(() => {
+    if (savedData) {
+      const timer = setTimeout(() => {
+        resetNoteData();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [savedData]);
+
+  // Use saved data if available, otherwise use current noteData
+  const displayData = savedData || { ...noteData, id };
+
+  return <SuccessPage data={displayData} />;
 };
 
 // 404 Not Found component
@@ -142,6 +156,7 @@ const App: React.FC = () => {
           <Route path="/view/:id" element={<ViewNote />} />
           <Route path="/note/:id" element={<ViewNote />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/aryan" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </NoteProvider>
