@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import emailjs from '@emailjs/browser';
 import { db, auth } from '../config/firebase';
 import { NoteData, VIBES } from '../types';
@@ -75,11 +75,43 @@ export default function Admin() {
     return () => unsubscribe();
   }, []);
 
+  // Handle redirect result (for mobile sign-in)
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          if (!ALLOWED_ADMINS.includes(result.user.email || '')) {
+            await signOut(auth);
+            setError('Access denied. This email is not authorized.');
+          }
+        }
+      } catch (err: any) {
+        console.error('Redirect sign in error:', err);
+        setError('Failed to sign in. Please try again.');
+      }
+    };
+    handleRedirectResult();
+  }, []);
+
+  // Detect if mobile device
+  const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
   // Handle Google Sign In
   const handleGoogleSignIn = async () => {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
+      
+      // Use redirect on mobile devices (popup often fails on mobile browsers)
+      if (isMobile()) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      
+      // Use popup on desktop
       const result = await signInWithPopup(auth, provider);
       
       if (!ALLOWED_ADMINS.includes(result.user.email || '')) {
@@ -88,7 +120,15 @@ export default function Admin() {
       }
     } catch (err: any) {
       console.error('Sign in error:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+        // Fallback to redirect if popup is blocked
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+        } catch (redirectErr) {
+          setError('Failed to sign in. Please try again.');
+        }
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setError('Failed to sign in. Please try again.');
       }
     }
