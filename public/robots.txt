@@ -1,0 +1,8 @@
+# robots.txt for justanote.me
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /aryan
+
+# Sitemap
+Sitemap: https://justanote.me/sitemap.xml
