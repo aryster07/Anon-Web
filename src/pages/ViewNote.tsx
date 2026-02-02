@@ -4,6 +4,13 @@ import { Loader2, Play, Pause, Heart, MessageCircle, ArrowLeft, AlertCircle, Ins
 import { getNote, incrementViews } from '../services/noteService';
 import { VIBES, NoteData, Vibe } from '../types';
 
+// Extend CanvasRenderingContext2D to include roundRect if not present
+declare global {
+  interface CanvasRenderingContext2D {
+    roundRect?(x: number, y: number, width: number, height: number, radius: number): this;
+  }
+}
+
 const ViewNote: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [note, setNote] = useState<NoteData | null>(null);
@@ -53,8 +60,41 @@ const ViewNote: React.FC = () => {
     // Stop any existing audio first
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.src = ''; // Clear src to free memory
       audioRef.current = null;
     }
+    
+    let timer: NodeJS.Timeout;
+    let interactionHandlerAdded = false;
+    
+    // Handler for user interaction to enable audio
+    const handleUserInteraction = () => {
+      if (!audioRef.current) {
+        const audio = new Audio(previewUrl);
+        audioRef.current = audio;
+        
+        audio.ontimeupdate = () => {
+          if (audioRef.current) {
+            const currentProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+            if (!isNaN(currentProgress)) {
+              setProgress(currentProgress);
+            }
+          }
+        };
+        audio.onended = () => {
+          setIsPlaying(false);
+          setProgress(0);
+        };
+        
+        audio.play().then(() => {
+          setIsPlaying(true);
+        }).catch(console.error);
+      } else if (!isPlaying) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(console.error);
+      }
+    };
     
     // Auto-play function that handles user interaction requirement
     const attemptAutoPlay = () => {
@@ -63,52 +103,48 @@ const ViewNote: React.FC = () => {
       
       audio.ontimeupdate = () => {
         if (audioRef.current) {
-          setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+          const currentProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+          if (!isNaN(currentProgress)) {
+            setProgress(currentProgress);
+          }
         }
       };
-      audio.onended = () => setIsPlaying(false);
+      audio.onended = () => {
+        setIsPlaying(false);
+        setProgress(0);
+      };
       
       audio.play().then(() => {
         setIsPlaying(true);
-        // Remove event listeners once autoplay succeeds
-        document.removeEventListener('click', handleUserInteraction);
-        document.removeEventListener('touchstart', handleUserInteraction);
-      }).catch((err) => {
+      }).catch(() => {
         // Autoplay was blocked - wait for user interaction
-        console.log('Autoplay blocked, waiting for user interaction:', err.message);
+        if (!interactionHandlerAdded) {
+          document.addEventListener('click', handleUserInteraction, { once: true });
+          document.addEventListener('touchstart', handleUserInteraction, { once: true });
+          interactionHandlerAdded = true;
+        }
       });
     };
     
-    // Handler for user interaction to enable audio
-    const handleUserInteraction = () => {
-      if (!isPlaying && audioRef.current) {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch(console.error);
-      } else if (!audioRef.current) {
-        attemptAutoPlay();
-      }
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
-    
     // Small delay to let the page render first
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       attemptAutoPlay();
-      // Add listeners for user interaction as fallback
-      document.addEventListener('click', handleUserInteraction, { once: true });
-      document.addEventListener('touchstart', handleUserInteraction, { once: true });
     }, 300);
     
     return () => {
       clearTimeout(timer);
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
+      if (interactionHandlerAdded) {
+        document.removeEventListener('click', handleUserInteraction);
+        document.removeEventListener('touchstart', handleUserInteraction);
+      }
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = ''; // Clear src to free memory
+        audioRef.current = null;
       }
+      setProgress(0);
     };
-  }, [note, loading]);
+  }, [note, loading, isPlaying]);
 
   // Check if audio playback is available (iTunes songs have preview)
   const hasAudioPreview = note?.songData?.preview || note?.song?.preview;
@@ -206,7 +242,29 @@ const ViewNote: React.FC = () => {
     try {
       // Create a canvas to generate the story image
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Could not get canvas context');
+      }
+      
+      // Polyfill for roundRect if not supported
+      if (!ctx.roundRect) {
+        ctx.roundRect = function(x: number, y: number, width: number, height: number, radius: number) {
+          this.beginPath();
+          this.moveTo(x + radius, y);
+          this.lineTo(x + width - radius, y);
+          this.quadraticCurveTo(x + width, y, x + width, y + radius);
+          this.lineTo(x + width, y + height - radius);
+          this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+          this.lineTo(x + radius, y + height);
+          this.quadraticCurveTo(x, y + height, x, y + height - radius);
+          this.lineTo(x, y + radius);
+          this.quadraticCurveTo(x, y, x + radius, y);
+          this.closePath();
+          return this;
+        };
+      }
       
       // Instagram story dimensions (1080x1920)
       canvas.width = 1080;

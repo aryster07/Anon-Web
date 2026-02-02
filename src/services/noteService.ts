@@ -1,11 +1,139 @@
-import { collection, doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { NoteData } from '../types';
 
-// Generate short unique ID
+// ============ VALIDATION CONSTANTS ============
+const MAX_NAME_LENGTH = 100;
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_INSTAGRAM_LENGTH = 30;
+const MAX_EMAIL_LENGTH = 254;
+
+// Regex patterns for validation
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const INSTAGRAM_REGEX = /^[a-zA-Z0-9._]{1,30}$/;
+
+// ============ SANITIZATION FUNCTIONS ============
+
+// Sanitize string to prevent XSS - removes dangerous HTML/script content
+const sanitizeString = (str: string): string => {
+  if (typeof str !== 'string') return '';
+  
+  return str
+    .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, '') // Remove event handlers like onclick=
+    .replace(/data:/gi, '') // Remove data: protocol (can be used for XSS)
+    .trim();
+};
+
+// Sanitize name fields (stricter)
+const sanitizeName = (name: string): string => {
+  if (typeof name !== 'string') return '';
+  // Only allow letters, numbers, spaces, hyphens, apostrophes, and common Unicode letters
+  return name
+    .slice(0, MAX_NAME_LENGTH)
+    .replace(/[<>{}[\]\\\/]/g, '') // Remove dangerous chars
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
+// Sanitize message content
+const sanitizeMessage = (message: string): string => {
+  if (typeof message !== 'string') return '';
+  return sanitizeString(message)
+    .slice(0, MAX_MESSAGE_LENGTH)
+    .replace(/\s+/g, ' ') // Normalize multiple spaces
+    .trim();
+};
+
+// Validate and sanitize Instagram handle
+const sanitizeInstagram = (handle: string): string => {
+  if (typeof handle !== 'string') return '';
+  // Remove @ if present at start
+  let cleaned = handle.trim().replace(/^@/, '');
+  // Only allow valid Instagram characters
+  cleaned = cleaned.replace(/[^a-zA-Z0-9._]/g, '');
+  return cleaned.slice(0, MAX_INSTAGRAM_LENGTH);
+};
+
+// Validate email format
+const isValidEmail = (email: string): boolean => {
+  if (typeof email !== 'string') return false;
+  if (email.length > MAX_EMAIL_LENGTH) return false;
+  return EMAIL_REGEX.test(email);
+};
+
+// Sanitize email
+const sanitizeEmail = (email: string): string => {
+  if (typeof email !== 'string') return '';
+  return email.toLowerCase().trim().slice(0, MAX_EMAIL_LENGTH);
+};
+
+// ============ VALIDATION FUNCTION ============
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export const validateNoteData = (data: Partial<NoteData>): ValidationResult => {
+  const errors: string[] = [];
+
+  // Recipient name validation
+  if (!data.recipientName || data.recipientName.trim().length < 1) {
+    errors.push('Recipient name is required');
+  } else if (data.recipientName.length > MAX_NAME_LENGTH) {
+    errors.push(`Recipient name must be ${MAX_NAME_LENGTH} characters or less`);
+  }
+
+  // Message validation
+  if (!data.message || data.message.trim().length < 1) {
+    errors.push('Message is required');
+  } else if (data.message.length > MAX_MESSAGE_LENGTH) {
+    errors.push(`Message must be ${MAX_MESSAGE_LENGTH} characters or less`);
+  }
+
+  // Sender name validation (if not anonymous)
+  if (!data.isAnonymous && (!data.senderName || data.senderName.trim().length < 1)) {
+    errors.push('Sender name is required when not anonymous');
+  }
+
+  // Email validation
+  if (data.senderEmail && !isValidEmail(data.senderEmail)) {
+    errors.push('Invalid email format');
+  }
+
+  // Instagram validation (if delivery method is admin)
+  if (data.deliveryMethod === 'admin') {
+    if (!data.recipientInstagram || data.recipientInstagram.trim().length < 1) {
+      errors.push('Instagram handle is required for admin delivery');
+    } else {
+      const cleanHandle = sanitizeInstagram(data.recipientInstagram);
+      if (!INSTAGRAM_REGEX.test(cleanHandle)) {
+        errors.push('Invalid Instagram handle format');
+      }
+    }
+  }
+
+  // Delivery method validation
+  if (data.deliveryMethod && !['self', 'admin'].includes(data.deliveryMethod)) {
+    errors.push('Invalid delivery method');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// ============ UTILITY FUNCTIONS ============
+
+// Generate short unique ID with timestamp for collision resistance
 const generateId = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  return Array.from({ length: 8 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+  const timestamp = Date.now().toString(36).slice(-4);
+  const random = Array.from({ length: 6 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+  return timestamp + random;
 };
 
 // Remove undefined values from object
@@ -84,8 +212,14 @@ export const compressImage = (file: File): Promise<string> => {
   });
 };
 
-// Save note to Firestore
+// Save note to Firestore with validation and sanitization
 export const saveNote = async (data: NoteData): Promise<string> => {
+  // Validate input data
+  const validation = validateNoteData(data);
+  if (!validation.isValid) {
+    throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+  }
+
   const id = generateId();
   const docRef = doc(collection(db, 'notes'), id);
 
@@ -99,60 +233,83 @@ export const saveNote = async (data: NoteData): Promise<string> => {
     }
   }
 
+  // Sanitize all string inputs before saving
+  const sanitizedData = {
+    recipientName: sanitizeName(data.recipientName),
+    senderName: data.isAnonymous ? '' : sanitizeName(data.senderName),
+    message: sanitizeMessage(data.message),
+    recipientInstagram: sanitizeInstagram(data.recipientInstagram),
+    senderEmail: sanitizeEmail(data.senderEmail),
+    vibe: data.vibe ? sanitizeString(data.vibe) : null,
+    song: data.song,
+    songData: data.songData,
+    isAnonymous: Boolean(data.isAnonymous),
+    deliveryMethod: data.deliveryMethod === 'admin' ? 'admin' : 'self',
+  };
+
   const docData = cleanData({
-    ...data,
+    ...sanitizedData,
     photo: null,
     photoUrl,
     createdAt: serverTimestamp(),
     views: 0,
     viewCount: 0,
-    status: data.deliveryMethod === 'admin' ? 'pending' : 'delivered',
-    deliveredAt: data.deliveryMethod === 'admin' ? null : serverTimestamp(),
+    status: sanitizedData.deliveryMethod === 'admin' ? 'pending' : 'delivered',
+    deliveredAt: sanitizedData.deliveryMethod === 'admin' ? null : serverTimestamp(),
   });
 
   await setDoc(docRef, docData);
   return id;
 };
 
-// Get note from Firestore
+// Get note from Firestore with sanitization (defense in depth)
 export const getNote = async (id: string): Promise<NoteData | null> => {
+  // Validate ID format to prevent injection
+  if (!id || typeof id !== 'string' || id.length > 20 || !/^[a-zA-Z0-9]+$/.test(id)) {
+    return null;
+  }
+
   const docRef = doc(collection(db, 'notes'), id);
   const docSnap = await getDoc(docRef);
 
   if (!docSnap.exists()) return null;
 
   const data = docSnap.data();
+  
+  // Sanitize data on retrieval as defense in depth
   return {
     id: docSnap.id,
-    recipientName: data.recipientName || '',
-    vibe: data.vibe || '',
+    recipientName: sanitizeName(data.recipientName || ''),
+    vibe: data.vibe ? sanitizeString(data.vibe) : '',
     song: data.song || null,
     songData: data.songData || null,
-    message: data.message || '',
+    message: sanitizeMessage(data.message || ''),
     photoUrl: data.photoUrl || null,
-    isAnonymous: data.isAnonymous ?? true,
-    senderName: data.senderName || '',
-    deliveryMethod: data.deliveryMethod || 'self',
-    recipientInstagram: data.recipientInstagram || '',
-    senderEmail: data.senderEmail || '',
+    isAnonymous: Boolean(data.isAnonymous ?? true),
+    senderName: sanitizeName(data.senderName || ''),
+    deliveryMethod: data.deliveryMethod === 'admin' ? 'admin' : 'self',
+    recipientInstagram: sanitizeInstagram(data.recipientInstagram || ''),
+    senderEmail: sanitizeEmail(data.senderEmail || ''),
     status: data.status || 'delivered',
     createdAt: data.createdAt,
-    viewCount: data.viewCount || 0,
+    viewCount: typeof data.viewCount === 'number' ? data.viewCount : 0,
     photo: null,
   };
 };
 
-// Increment view count
+// Increment view count atomically (prevents race conditions)
 export const incrementViews = async (id: string): Promise<void> => {
-  const docRef = doc(collection(db, 'notes'), id);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    const currentViews = docSnap.data().views || 0;
+  try {
+    const docRef = doc(collection(db, 'notes'), id);
+    // Use atomic increment - no read required, prevents race conditions
     await updateDoc(docRef, {
-      views: currentViews + 1,
-      viewCount: currentViews + 1,
-      viewedAt: serverTimestamp()
+      views: increment(1),
+      viewCount: increment(1),
+      viewedAt: serverTimestamp(),
+      lastViewedAt: serverTimestamp()
     });
+  } catch (error) {
+    // Silently fail for view counts - not critical
+    console.error('Failed to increment views:', error);
   }
 };

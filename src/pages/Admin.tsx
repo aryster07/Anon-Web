@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import emailjs from '@emailjs/browser';
 import { db, auth } from '../config/firebase';
@@ -187,18 +187,74 @@ export default function Admin() {
     }
   };
 
-  // Fetch notes when authorized
+  // Real-time listener for notes
   useEffect(() => {
-    if (isAuthorized) {
-      fetchNotes();
-    }
+    if (!isAuthorized) return;
+
+    setLoading(true);
+    
+    // Create query for admin delivery notes
+    const q = query(
+      collection(db, 'notes'),
+      where('deliveryMethod', '==', 'admin'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    // Set up real-time listener
+    const unsubscribe: Unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const allNotes: Note[] = snapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id,
+        })) as Note[];
+
+        // Calculate stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const pending = allNotes.filter(n => n.status === 'pending').length;
+        const delivered = allNotes.filter(n => n.status === 'delivered').length;
+        const todayCreated = allNotes.filter(n => {
+          if (!n.createdAt?.toDate) return false;
+          const created = n.createdAt.toDate();
+          return created >= today;
+        }).length;
+
+        setStats({
+          total: allNotes.length,
+          pending,
+          delivered,
+          todayCreated
+        });
+
+        setNotes(allNotes);
+        setLoading(false);
+        setError('');
+      },
+      (err) => {
+        console.error('Error listening to notes:', err);
+        // If composite index is missing, show helpful error
+        if (err.code === 'failed-precondition') {
+          setError('Database index required. Please check Firebase Console for the index creation link.');
+        } else {
+          setError('Failed to load notes. Pull to refresh.');
+        }
+        setLoading(false);
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, [isAuthorized]);
 
-  // Fetch notes
-  const fetchNotes = async () => {
+  // Manual refresh function (forces re-fetch)
+  const refreshNotes = async () => {
+    if (!isAuthorized) return;
     setLoading(true);
+    setError('');
+    
     try {
-      // Only fetch notes where deliveryMethod is 'admin' (user selected "let us send it")
       const q = query(
         collection(db, 'notes'),
         where('deliveryMethod', '==', 'admin'),
@@ -211,7 +267,7 @@ export default function Admin() {
         id: doc.id,
       })) as Note[];
 
-      // Calculate stats (only for admin delivery notes)
+      // Calculate stats
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -231,9 +287,13 @@ export default function Admin() {
       });
 
       setNotes(allNotes);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching notes:', err);
-      setError('Failed to fetch notes');
+      if (err.code === 'failed-precondition') {
+        setError('Database index required. Check Firebase Console.');
+      } else {
+        setError('Failed to fetch notes');
+      }
     }
     setLoading(false);
   };
@@ -448,7 +508,7 @@ export default function Admin() {
           
           <div className="flex items-center gap-2">
             <button
-              onClick={fetchNotes}
+              onClick={refreshNotes}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors"
             >

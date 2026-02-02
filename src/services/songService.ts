@@ -1,44 +1,91 @@
 import { Song, SongData } from '../types';
 
-// Cache for search results
-const searchCache = new Map<string, Song[]>();
-let popularCache: Song[] | null = null;
+// Cache with TTL (Time To Live)
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
-// Parse iTunes response
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const searchCache = new Map<string, CacheEntry<Song[]>>();
+let popularCache: CacheEntry<Song[]> | null = null;
+
+// Check if cache is still valid
+const isCacheValid = <T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> => {
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < CACHE_TTL;
+};
+
+// Clear expired cache entries periodically
+const cleanupCache = () => {
+  const now = Date.now();
+  searchCache.forEach((entry, key) => {
+    if (now - entry.timestamp >= CACHE_TTL) {
+      searchCache.delete(key);
+    }
+  });
+};
+
+// Run cleanup every 10 minutes
+if (typeof window !== 'undefined') {
+  setInterval(cleanupCache, 10 * 60 * 1000);
+}
+
+// Parse iTunes response with validation
 const parseITunesResponse = (data: any): Song[] => {
   if (!data?.results?.length) return [];
   
   return data.results
-    .filter((t: any) => t.previewUrl && t.kind === 'song')
+    .filter((t: any) => t.previewUrl && t.kind === 'song' && t.trackId)
     .map((t: any) => ({
       id: t.trackId,
-      title: t.trackName || 'Unknown',
-      artist: t.artistName || 'Unknown Artist',
-      album: t.collectionName || '',
+      title: (t.trackName || 'Unknown').slice(0, 100), // Limit length
+      artist: (t.artistName || 'Unknown Artist').slice(0, 100),
+      album: (t.collectionName || '').slice(0, 100),
       albumCover: t.artworkUrl100?.replace('100x100', '300x300') || '',
       preview: t.previewUrl,
       duration: Math.floor((t.trackTimeMillis || 30000) / 1000),
     }));
 };
 
-// Fetch from iTunes
-const fetchFromITunes = async (url: string): Promise<any> => {
+// Fetch from iTunes with retry logic
+const fetchFromITunes = async (url: string, retries = 2): Promise<any> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { 
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
     clearTimeout(timeout);
-    return res.ok ? await res.json() : null;
-  } catch {
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    
+    return await res.json();
+  } catch (error) {
     clearTimeout(timeout);
+    
+    // Retry on network errors
+    if (retries > 0 && !(error instanceof DOMException && error.name === 'AbortError')) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+      return fetchFromITunes(url, retries - 1);
+    }
+    
     return null;
   }
 };
 
-// Get popular songs
+// Get popular songs with improved caching
 export const getPopularSongs = async (): Promise<Song[]> => {
-  if (popularCache?.length) return popularCache;
+  // Return cached data if valid
+  if (isCacheValid(popularCache) && popularCache.data.length > 0) {
+    return popularCache.data;
+  }
 
   const queries = [
     'https://itunes.apple.com/search?term=top+hits+2024&media=music&entity=song&limit=8',
@@ -47,33 +94,52 @@ export const getPopularSongs = async (): Promise<Song[]> => {
   ];
 
   const allSongs: Song[] = [];
-  for (const url of queries) {
-    const data = await fetchFromITunes(url);
-    if (data) allSongs.push(...parseITunesResponse(data));
-    if (allSongs.length >= 12) break;
+  
+  // Fetch in parallel for faster loading
+  const results = await Promise.allSettled(
+    queries.map(url => fetchFromITunes(url))
+  );
+  
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value) {
+      allSongs.push(...parseITunesResponse(result.value));
+    }
   }
 
   const unique = Array.from(new Map(allSongs.map(s => [s.id, s])).values());
-  popularCache = unique.slice(0, 15);
-  return popularCache.length ? popularCache : FALLBACK_SONGS;
+  const finalSongs = unique.slice(0, 15);
+  
+  if (finalSongs.length > 0) {
+    popularCache = { data: finalSongs, timestamp: Date.now() };
+    return finalSongs;
+  }
+  
+  return FALLBACK_SONGS;
 };
 
-// Search songs
+// Search songs with debounce-friendly caching
 export const searchSongs = async (query: string): Promise<Song[]> => {
-  if (!query.trim()) return [];
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length < 2) return []; // Require at least 2 chars
 
-  const key = query.toLowerCase().trim();
-  if (searchCache.has(key)) return searchCache.get(key)!;
+  const key = trimmed.toLowerCase();
+  
+  // Check cache
+  const cached = searchCache.get(key);
+  if (isCacheValid(cached)) {
+    return cached.data;
+  }
 
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(trimmed)}&media=music&entity=song&limit=15`;
   const data = await fetchFromITunes(url);
   const songs = parseITunesResponse(data);
 
   if (songs.length) {
-    searchCache.set(key, songs);
+    searchCache.set(key, { data: songs, timestamp: Date.now() });
     return songs;
   }
 
+  // Fallback search
   return FALLBACK_SONGS.filter(s =>
     s.title.toLowerCase().includes(key) || s.artist.toLowerCase().includes(key)
   );
