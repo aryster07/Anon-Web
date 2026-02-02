@@ -1,27 +1,30 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Notes collection - allow read/write for now (add auth later)
+    // Notes collection
     match /notes/{noteId} {
-      // Anyone can read notes (to view them)
+      // Anyone can read notes (needed to view them)
       allow read: if true;
 
-      // Anyone can create notes
+      // Anyone can create notes (public feature)
       allow create: if true;
 
-      // Allow updates (for view counts, status changes)
-      allow update: if true;
+      // Only allow updating specific fields (view counts) - no message tampering
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['views', 'viewCount', 'viewedAt', 'lastViewedAt', 'status', 'deliveredAt']);
 
-      // Allow deletes (for admin functionality)
-      allow delete: if true;
+      // Only authenticated admins can delete
+      // For now, allow delete from authenticated users only
+      allow delete: if request.auth != null;
     }
 
     // Legacy collection name support
     match /dedications/{dedicationId} {
       allow read: if true;
       allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['views', 'viewCount', 'viewedAt', 'lastViewedAt', 'status', 'deliveredAt']);
+      allow delete: if request.auth != null;
     }
   }
 }

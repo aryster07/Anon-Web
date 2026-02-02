@@ -65,7 +65,6 @@ export default function Admin() {
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('Auth state changed:', currentUser?.email);
       setUser(currentUser);
       if (currentUser && ALLOWED_ADMINS.includes(currentUser.email || '')) {
         setIsAuthorized(true);
@@ -85,9 +84,7 @@ export default function Admin() {
   useEffect(() => {
     const handleRedirectResult = async () => {
       try {
-        console.log('Checking redirect result...');
         const result = await getRedirectResult(auth);
-        console.log('Redirect result:', result?.user?.email);
         
         if (result && result.user) {
           if (!ALLOWED_ADMINS.includes(result.user.email || '')) {
@@ -204,7 +201,6 @@ export default function Admin() {
     const unsubscribe: Unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log('Firestore snapshot received:', snapshot.docs.length, 'documents');
         const allNotes: Note[] = snapshot.docs.map(doc => ({
           ...doc.data(),
           id: doc.id,
@@ -234,12 +230,9 @@ export default function Admin() {
         setError('');
       },
       (err) => {
-        console.error('Error listening to notes:', err);
         // If composite index is missing, show helpful error with the link
         if (err.code === 'failed-precondition') {
-          // Firebase error message contains a direct link to create the index
-          console.error('INDEX REQUIRED - Click the link in this error:', err.message);
-          setError('Database index required. Check browser console (F12) for the index creation link.');
+          setError('Database index required. Check browser console for the index creation link.');
         } else {
           setError(`Failed to load notes: ${err.message || 'Unknown error'}`);
         }
@@ -332,9 +325,7 @@ export default function Admin() {
             },
             EMAILJS_PUBLIC_KEY
           );
-          console.log('Email sent successfully to:', note.senderEmail);
-        } catch (emailErr) {
-          console.error('Failed to send email:', emailErr);
+        } catch {
           // Don't block the delivery status update if email fails
         }
       }

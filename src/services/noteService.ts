@@ -258,9 +258,7 @@ export const saveNote = async (data: NoteData): Promise<string> => {
     deliveredAt: sanitizedData.deliveryMethod === 'admin' ? null : serverTimestamp(),
   });
 
-  console.log('Saving note to Firestore:', { id, deliveryMethod: docData.deliveryMethod, status: docData.status });
   await setDoc(docRef, docData);
-  console.log('Note saved successfully:', id);
   return id;
 };
 

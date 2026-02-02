@@ -469,9 +469,7 @@ export const DeliveryStep: React.FC<StepProps> = ({ data, updateData }) => {
 
     setLoading(true);
     try {
-      console.log('Saving note with deliveryMethod:', data.deliveryMethod);
       const noteId = await saveNote(data);
-      console.log('Note saved successfully with ID:', noteId);
       navigate(`/success/${noteId}`);
     } catch (error) {
       console.error('Error saving note:', error);
