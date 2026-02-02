@@ -6,24 +6,29 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const SEARCH_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for search results
+const POPULAR_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours for popular songs (keeps them fresh)
 const searchCache = new Map<string, CacheEntry<Song[]>>();
 let popularCache: CacheEntry<Song[]> | null = null;
 
 // Check if cache is still valid
-const isCacheValid = <T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> => {
+const isCacheValid = <T>(entry: CacheEntry<T> | null, ttl: number): entry is CacheEntry<T> => {
   if (!entry) return false;
-  return Date.now() - entry.timestamp < CACHE_TTL;
+  return Date.now() - entry.timestamp < ttl;
 };
 
 // Clear expired cache entries periodically
 const cleanupCache = () => {
   const now = Date.now();
   searchCache.forEach((entry, key) => {
-    if (now - entry.timestamp >= CACHE_TTL) {
+    if (now - entry.timestamp >= SEARCH_CACHE_TTL) {
       searchCache.delete(key);
     }
   });
+  // Also clear popular cache if expired
+  if (popularCache && now - popularCache.timestamp >= POPULAR_CACHE_TTL) {
+    popularCache = null;
+  }
 };
 
 // Run cleanup every 10 minutes
@@ -80,10 +85,10 @@ const fetchFromITunes = async (url: string, retries = 2): Promise<any> => {
   }
 };
 
-// Get popular songs with improved caching
+// Get popular songs with 2-hour cache refresh
 export const getPopularSongs = async (): Promise<Song[]> => {
-  // Return cached data if valid
-  if (isCacheValid(popularCache) && popularCache.data.length > 0) {
+  // Return cached data if valid (2-hour TTL keeps songs fresh)
+  if (isCacheValid(popularCache, POPULAR_CACHE_TTL) && popularCache.data.length > 0) {
     return popularCache.data;
   }
 
@@ -124,9 +129,9 @@ export const searchSongs = async (query: string): Promise<Song[]> => {
 
   const key = trimmed.toLowerCase();
   
-  // Check cache
+  // Check cache (30-minute TTL for search results)
   const cached = searchCache.get(key);
-  if (isCacheValid(cached)) {
+  if (isCacheValid(cached, SEARCH_CACHE_TTL)) {
     return cached.data;
   }
 
