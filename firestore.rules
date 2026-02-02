@@ -12,8 +12,8 @@ service cloud.firestore {
       // Allow updates (for view counts, status changes)
       allow update: if true;
 
-      // Don't allow deletes for now
-      allow delete: if false;
+      // Allow deletes (for admin functionality)
+      allow delete: if true;
     }
 
     // Legacy collection name support
@@ -21,7 +21,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
       allow update: if true;
-      allow delete: if false;
+      allow delete: if true;
     }
   }
 }
