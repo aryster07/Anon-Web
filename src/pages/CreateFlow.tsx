@@ -488,8 +488,8 @@ export const DeliveryStep: React.FC<StepProps> = ({ data, updateData }) => {
 
       <main className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto px-5 sm:px-8 lg:px-16 pb-32">
         <div className="py-4">
-          <h1 className="text-2xl font-bold text-slate-900">How should we deliver?</h1>
-          <p className="text-slate-500 text-sm mt-1">Choose how you'd like to share</p>
+          <h1 className="text-2xl font-bold text-slate-900">How do you want to send it?</h1>
+          <p className="text-slate-500 text-sm mt-1">Pick how you'd like to share this note</p>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -500,8 +500,13 @@ export const DeliveryStep: React.FC<StepProps> = ({ data, updateData }) => {
               data.deliveryMethod === 'self' ? 'border-royal-gold bg-royal-gold/5' : 'border-slate-200'
             }`}
           >
-            <h3 className="font-bold text-lg text-slate-900">Share link myself</h3>
-            <p className="text-sm text-slate-500 mt-1">Get a link to share directly</p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔗</span>
+              <div>
+                <h3 className="font-bold text-lg text-slate-900">I'll share it myself</h3>
+                <p className="text-sm text-slate-500 mt-0.5">Get a link and send it via WhatsApp, text, or any app you like</p>
+              </div>
+            </div>
           </button>
 
           {/* Admin delivery */}
@@ -511,9 +516,22 @@ export const DeliveryStep: React.FC<StepProps> = ({ data, updateData }) => {
               data.deliveryMethod === 'admin' ? 'border-royal-gold bg-royal-gold/5' : 'border-slate-200'
             }`}
           >
-            <h3 className="font-bold text-lg text-slate-900">We'll deliver it</h3>
-            <p className="text-sm text-slate-500 mt-1">We'll send it via Instagram DM</p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">💌</span>
+              <div>
+                <h3 className="font-bold text-lg text-slate-900">Send it for me</h3>
+                <p className="text-sm text-slate-500 mt-0.5">We'll DM the note to them on Instagram (perfect for surprises!)</p>
+              </div>
+            </div>
           </button>
+
+          {data.deliveryMethod === 'admin' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-2">
+              <p className="text-sm text-amber-800">
+                <span className="font-bold">How it works:</span> We'll send a DM from @justanote.me to the recipient's Instagram with your note link. They won't know who sent it unless you reveal your name!
+              </p>
+            </div>
+          )}
 
           {data.deliveryMethod === 'admin' && (
             <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
