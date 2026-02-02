@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, Play, Pause, Heart, MessageCircle, ArrowLeft, AlertCircle, Instagram, Download, Share2 } from 'lucide-react';
+import { Loader2, Play, Pause, Heart, MessageCircle, ArrowLeft, AlertCircle, Instagram, Share2, Volume2, VolumeX } from 'lucide-react';
 import { getNote, incrementViews } from '../services/noteService';
 import { VIBES, NoteData, Vibe } from '../types';
+
+// Vibe-specific gradients for story backgrounds
+const VIBE_GRADIENTS: Record<string, string> = {
+  love: 'from-rose-400 via-pink-300 to-red-400',
+  gratitude: 'from-amber-300 via-yellow-200 to-orange-300',
+  friendship: 'from-purple-400 via-indigo-300 to-blue-400',
+  support: 'from-teal-400 via-cyan-300 to-blue-400',
+  celebration: 'from-yellow-400 via-orange-300 to-pink-400',
+  memory: 'from-slate-400 via-blue-300 to-indigo-400',
+};
 
 // Extend CanvasRenderingContext2D to include roundRect if not present
 declare global {
@@ -499,169 +509,184 @@ const ViewNote: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white flex flex-col">
-      {/* Header */}
-      <header className="p-4 flex justify-between items-center">
-        <Link to="/" className="text-slate-400 hover:text-slate-600">
-          <ArrowLeft size={24} />
+    <div className="min-h-screen bg-black flex flex-col relative overflow-hidden">
+      {/* Story-like gradient background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${VIBE_GRADIENTS[note.vibe] || 'from-royal-gold via-amber-300 to-orange-400'} opacity-90`} />
+      
+      {/* Decorative blur circles */}
+      <div className="absolute top-20 -left-20 w-64 h-64 bg-white/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-40 -right-20 w-80 h-80 bg-white/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+      
+      {/* Story progress bar */}
+      <div className="absolute top-0 left-0 right-0 z-50 px-3 pt-3 safe-area-top">
+        <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-white rounded-full transition-all duration-200"
+            style={{ width: `${progress || 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Header - Instagram story style */}
+      <header className="relative z-40 p-4 pt-8 flex justify-between items-center">
+        <Link to="/" className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/30 transition-colors">
+          <ArrowLeft size={20} />
         </Link>
-        <div className="flex flex-col items-center">
-          <span className="text-4xl">{vibe?.emoji || '💌'}</span>
+        
+        <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full">
+          <span className="text-2xl">{vibe?.emoji || '💌'}</span>
           {vibe?.label && (
-            <span className="text-xs font-medium text-royal-gold mt-1">{vibe.label}</span>
+            <span className="text-sm font-semibold text-white">{vibe.label}</span>
           )}
         </div>
+        
         <button 
           onClick={shareToInstagram}
-          className="text-royal-gold hover:text-royal-gold-dark transition-colors"
+          className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/30 transition-colors"
           title="Share to Instagram"
         >
-          <Share2 size={24} />
+          <Share2 size={20} />
         </button>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col items-center px-6 py-8">
-        <div className="max-w-md w-full">
-          {/* Recipient */}
-          <div className="text-center mb-8">
-            <p className="text-slate-500 text-sm">A note for</p>
-            <h1 className="text-3xl font-serif font-bold gold-text-gradient mt-1">
-              {note.recipientName}
-            </h1>
-          </div>
+      {/* Main content - Story card */}
+      <main className="flex-1 relative z-30 flex flex-col items-center justify-center px-4 py-4">
+        <div className="w-full max-w-sm">
+          {/* Glass card container */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden">
+            {/* Recipient header */}
+            <div className="text-center pt-6 pb-4 px-6 border-b border-slate-100">
+              <p className="text-slate-400 text-xs uppercase tracking-widest">A note for</p>
+              <h1 className="text-2xl font-serif font-bold bg-gradient-to-r from-rose-500 via-pink-500 to-red-500 bg-clip-text text-transparent mt-1">
+                {note.recipientName}
+              </h1>
+            </div>
 
-          {/* Song player - Now above photo */}
-          {note.song && (
-            <div className="mb-6 bg-white rounded-2xl p-4 shadow-md border border-slate-100">
-              <div className="flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                  <img
-                    src={note.song.albumCover || note.song.coverUrl || note.songData?.albumCover}
-                    alt={note.song.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    onClick={togglePlay}
-                    className="absolute inset-0 bg-black/30 flex items-center justify-center 
-                      hover:bg-black/40 transition-colors"
-                    title={externalLink ? 'Open in app' : (hasAudioPreview ? 'Play preview' : 'No preview available')}
-                  >
-                    {isPlaying ? (
-                      <Pause size={24} className="text-white" fill="white" />
-                    ) : (
-                      <Play size={24} className="text-white" fill="white" />
-                    )}
-                  </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-slate-900 truncate">{note.song.title}</p>
-                    {note.songData?.type === 'youtube' && (
-                      <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">YT</span>
-                    )}
-                    {note.songData?.type === 'spotify' && (
-                      <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Spotify</span>
+            {/* Song player - sleek inline style */}
+            {note.song && (
+              <div className="mx-4 mt-4 p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+                    <img
+                      src={note.song.albumCover || note.song.coverUrl || note.songData?.albumCover}
+                      alt={note.song.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={togglePlay}
+                      className="absolute inset-0 bg-black/40 flex items-center justify-center hover:bg-black/50 transition-colors"
+                      title={externalLink ? 'Open in app' : (hasAudioPreview ? 'Play preview' : 'No preview available')}
+                    >
+                      {isPlaying ? (
+                        <Pause size={18} className="text-white" fill="white" />
+                      ) : (
+                        <Play size={18} className="text-white" fill="white" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-sm text-slate-800 truncate">{note.song.title}</p>
+                      {note.songData?.type === 'youtube' && (
+                        <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">YT</span>
+                      )}
+                      {note.songData?.type === 'spotify' && (
+                        <span className="text-[9px] font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">●</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">{note.song.artist}</p>
+                    {hasAudioPreview && (
+                      <div className="mt-1.5 h-1 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-rose-400 to-pink-500 transition-all duration-200"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500 truncate">{note.song.artist}</p>
-                  {/* Progress bar - only show for audio preview */}
-                  {hasAudioPreview && (
-                    <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-royal-gold transition-all duration-200"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  )}
-                  {/* External link hint for YouTube/Spotify */}
-                  {externalLink && !hasAudioPreview && (
-                    <p className="mt-2 text-xs text-slate-400">Tap to open in app</p>
-                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Photo and Message together */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden mb-8">
             {/* Photo */}
             {note.photoUrl && (
-              <div className="relative">
-                <img
-                  src={note.photoUrl}
-                  alt="Memory"
-                  className="w-full aspect-square object-cover"
-                />
+              <div className="mx-4 mt-4">
+                <div className="relative rounded-2xl overflow-hidden shadow-lg">
+                  <img
+                    src={note.photoUrl}
+                    alt="Memory"
+                    className="w-full aspect-square object-cover"
+                  />
+                  {/* Subtle gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                </div>
               </div>
             )}
 
             {/* Message */}
             <div className="p-6">
-              <MessageCircle size={24} className="text-royal-gold mb-4" />
-              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed line-clamp-[12]">
-                {note.message}
-              </p>
-              {note.message.length > 400 && (
-                <p className="text-royal-gold text-sm mt-2 font-medium">...</p>
-              )}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center flex-shrink-0">
+                  <MessageCircle size={16} className="text-white" />
+                </div>
+                <p className="text-slate-700 text-sm leading-relaxed flex-1">
+                  {note.message}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Sender */}
-          <div className="text-center text-slate-500">
-            {note.isAnonymous ? (
-              <p className="italic">Sent anonymously with ❤️</p>
-            ) : (
-              <p>
-                With love, <span className="font-bold text-slate-700">{note.senderName}</span>
-              </p>
-            )}
-          </div>
+            {/* Sender */}
+            <div className="px-6 pb-4 text-center">
+              <div className="inline-block px-4 py-2 bg-slate-50 rounded-full">
+                {note.isAnonymous ? (
+                  <p className="text-xs text-slate-500 italic">Sent anonymously with ❤️</p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    With love, <span className="font-bold text-slate-700">{note.senderName}</span>
+                  </p>
+                )}
+              </div>
+            </div>
 
-          {/* Share to Instagram Button */}
-          <div className="mt-8">
-            <button
-              onClick={shareToInstagram}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 
-                bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 
-                text-white font-bold rounded-xl shadow-lg hover:scale-[1.02] 
-                active:scale-[0.98] transition-transform"
-            >
-              <Instagram size={24} />
-              Share to Instagram Story
-            </button>
-            <p className="text-center text-xs text-slate-400 mt-2">
-              Save the image and add it to your Instagram Story
-            </p>
-          </div>
-
-          {/* CTA */}
-          <div className="mt-8 text-center">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gold-gradient text-white 
-                font-bold rounded-full shadow-gold-glow hover:scale-105 transition-transform"
-            >
-              <Heart size={20} />
-              Create Your Own Note
-            </Link>
+            {/* Action buttons */}
+            <div className="px-4 pb-4 flex gap-3">
+              <button
+                onClick={shareToInstagram}
+                className="flex-1 flex items-center justify-center gap-2 py-3 
+                  bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 
+                  text-white text-sm font-bold rounded-xl shadow-lg hover:scale-[1.02] 
+                  active:scale-[0.98] transition-transform"
+              >
+                <Instagram size={18} />
+                Share Story
+              </button>
+              <Link
+                to="/"
+                className="flex-1 flex items-center justify-center gap-2 py-3 
+                  bg-gradient-to-r from-rose-500 to-pink-500 
+                  text-white text-sm font-bold rounded-xl shadow-lg hover:scale-[1.02] 
+                  active:scale-[0.98] transition-transform"
+              >
+                <Heart size={18} />
+                Create Yours
+              </Link>
+            </div>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="p-6 text-center text-xs text-slate-400">
+      {/* Footer - floating style */}
+      <footer className="relative z-40 p-4 pb-6 text-center">
         <a 
           href="https://instagram.com/justanote.me" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-royal-gold hover:underline font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-colors"
         >
-          📷 @justanote.me
+          <Instagram size={16} />
+          <span className="text-sm font-medium">@justanote.me</span>
         </a>
-        <span className="mx-2">•</span>
-        Made with ❤️ by Just A Note
       </footer>
     </div>
   );
