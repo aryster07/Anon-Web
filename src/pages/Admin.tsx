@@ -6,7 +6,6 @@ import { db, auth } from '../config/firebase';
 import { NoteData, VIBES } from '../types';
 import { 
   Lock, 
-  Eye, 
   Instagram, 
   Trash2, 
   Mail, 
@@ -717,16 +716,6 @@ export default function Admin() {
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2">
-                      <a
-                        href={`/note/${note.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View Note
-                      </a>
-                      
                       <button
                         onClick={() => copyLink(note.id)}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
