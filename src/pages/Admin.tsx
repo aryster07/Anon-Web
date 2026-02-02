@@ -587,16 +587,6 @@ export default function Admin() {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
-              {notes.length > 0 && currentView === 'delivery' && (
-                <button
-                  onClick={deleteAllNotes}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete All
-                </button>
-              )}
               <button
                 onClick={handleSignOut}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
@@ -733,13 +723,13 @@ export default function Admin() {
                   className="bg-white rounded-xl border border-rose-100 shadow-sm overflow-hidden"
                 >
                   <div className="p-4 md:p-6">
-                    {/* Header */}
+                    {/* Header - Minimal info for privacy */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="text-3xl">{vibe.emoji}</div>
                         <div>
                           <h3 className="font-semibold text-gray-900">
-                            To: {note.recipientName}
+                            Note #{note.id.slice(-6).toUpperCase()}
                           </h3>
                           <p className="text-sm text-gray-500">
                             {vibe.label} • {formatDate(note.createdAt)}
@@ -756,72 +746,23 @@ export default function Admin() {
                       </span>
                     </div>
 
-                    {/* Details Grid */}
-                    <div className="grid md:grid-cols-2 gap-4 mb-4">
-                      {/* Sender Info */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <UserIcon className="w-4 h-4" />
-                          <span>
-                            {note.isAnonymous ? 'Anonymous' : note.senderName || 'Not provided'}
-                          </span>
-                        </div>
-                        
-                        {note.senderEmail && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail className="w-4 h-4" />
-                            <a 
-                              href={`mailto:${note.senderEmail}`}
-                              className="text-rose-500 hover:underline"
-                            >
-                              {note.senderEmail}
-                            </a>
-                          </div>
-                        )}
-                        
-                        {note.recipientInstagram && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Instagram className="w-4 h-4" />
-                            <a 
-                              href={`https://instagram.com/${note.recipientInstagram.replace('@', '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-rose-500 hover:underline"
-                            >
-                              {note.recipientInstagram.startsWith('@') ? note.recipientInstagram : `@${note.recipientInstagram}`}
-                            </a>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Song Info */}
-                      {note.song && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          {note.song.albumCover || note.song.coverUrl ? (
-                            <img 
-                              src={note.song.albumCover || note.song.coverUrl} 
-                              alt="" 
-                              className="w-12 h-12 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-rose-100 rounded-lg flex items-center justify-center">
-                              <Music className="w-6 h-6 text-rose-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{note.song.title}</p>
-                            <p className="text-sm text-gray-500 truncate">{note.song.artist}</p>
-                          </div>
+                    {/* Only show Instagram handle for delivery - no other personal info */}
+                    <div className="mb-4">
+                      {note.recipientInstagram && (
+                        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                          <Instagram className="w-5 h-5 text-pink-500" />
+                          <span className="font-medium text-gray-900">Deliver to:</span>
+                          <a 
+                            href={`https://instagram.com/${note.recipientInstagram.replace('@', '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-rose-500 hover:underline font-semibold"
+                          >
+                            @{note.recipientInstagram.replace('@', '')}
+                          </a>
                         </div>
                       )}
                     </div>
-
-                    {/* Message Preview */}
-                    {note.message && (
-                      <div className="p-3 bg-gray-50 rounded-lg mb-4">
-                        <p className="text-sm text-gray-600 line-clamp-3">{note.message}</p>
-                      </div>
-                    )}
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2">
@@ -845,17 +786,9 @@ export default function Admin() {
                           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors"
                         >
                           <Instagram className="w-4 h-4" />
-                          Send via DM
+                          Open IG Profile
                         </a>
                       )}
-
-                      <button
-                        onClick={() => deleteNote(note.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </button>
 
                       {note.status === 'pending' && (
                         <button
@@ -1039,81 +972,36 @@ export default function Admin() {
               </div>
 
               {/* Filtered Notes List */}
-              <div className="space-y-4">
-                {allNotes
-                  .filter(note => {
-                    // Date filter
-                    if (dateFilter.startDate || dateFilter.endDate) {
-                      if (!note.createdAt?.toDate) return false;
-                      const noteDate = note.createdAt.toDate();
-                      if (dateFilter.startDate && noteDate < new Date(dateFilter.startDate)) return false;
-                      if (dateFilter.endDate && noteDate > new Date(dateFilter.endDate + 'T23:59:59')) return false;
-                    }
-                    
-                    // Vibe filter
-                    if (vibeFilter !== 'all' && note.vibe !== vibeFilter) return false;
-                    
-                    // Delivery method filter
-                    if (deliveryMethodFilter !== 'all' && note.deliveryMethod !== deliveryMethodFilter) return false;
-                    
-                    // Status filter
-                    if (statusFilter !== 'all' && note.status !== statusFilter) return false;
-                    
-                    return true;
-                  })
-                  .map((note) => {
-                    const vibe = getVibe(note.vibe || '1');
-                    
-                    return (
-                      <div 
-                        key={note.id}
-                        className="bg-white rounded-xl border border-rose-100 shadow-sm p-4"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl">{vibe.emoji}</div>
-                            <div>
-                              <h3 className="font-semibold text-gray-900">To: {note.recipientName}</h3>
-                              <p className="text-sm text-gray-500">
-                                {vibe.label} • {formatDate(note.createdAt)} • {note.deliveryMethod === 'admin' ? 'Admin Delivery' : 'Self Delivery'}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            note.status === 'pending' 
-                              ? 'bg-amber-100 text-amber-700' 
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {note.status === 'pending' ? 'Pending' : 'Delivered'}
-                          </span>
-                        </div>
-
-                        {note.message && (
-                          <p className="text-sm text-gray-600 line-clamp-2 mb-2">{note.message}</p>
-                        )}
-
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {note.song && (
-                            <span className="flex items-center gap-1">
-                              <Music className="w-3 h-3" />
-                              {note.song.title}
-                            </span>
-                          )}
-                          {note.senderEmail && (
-                            <span className="flex items-center gap-1">
-                              <Mail className="w-3 h-3" />
-                              {note.senderEmail}
-                            </span>
-                          )}
-                          {note.viewCount !== undefined && (
-                            <span className="ml-auto">👁️ {note.viewCount} views</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                }
+              <div className="bg-white rounded-xl border border-rose-100 shadow-sm p-6">
+                <div className="text-center py-8">
+                  <BarChart3 className="w-12 h-12 text-rose-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg font-medium">
+                    {allNotes
+                      .filter(note => {
+                        // Date filter
+                        if (dateFilter.startDate || dateFilter.endDate) {
+                          if (!note.createdAt?.toDate) return false;
+                          const noteDate = note.createdAt.toDate();
+                          if (dateFilter.startDate && noteDate < new Date(dateFilter.startDate)) return false;
+                          if (dateFilter.endDate && noteDate > new Date(dateFilter.endDate + 'T23:59:59')) return false;
+                        }
+                        
+                        // Vibe filter
+                        if (vibeFilter !== 'all' && note.vibe !== vibeFilter) return false;
+                        
+                        // Delivery method filter
+                        if (deliveryMethodFilter !== 'all' && note.deliveryMethod !== deliveryMethodFilter) return false;
+                        
+                        // Status filter
+                        if (statusFilter !== 'all' && note.status !== statusFilter) return false;
+                        
+                        return true;
+                      }).length} notes match your filters
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    Note contents are private and not displayed here
+                  </p>
+                </div>
               </div>
             </div>
           </>
