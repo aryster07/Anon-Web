@@ -57,7 +57,9 @@ interface DateFilter {
 // Allowed admin emails
 const ALLOWED_ADMINS = [
   'aryanrana762@gmail.com',
-  'justanote07@gmail.com'
+  'justanote07@gmail.com',
+  'arshrana762@gmail.com',
+  'anushkapuri17@gmail.com'
 ];
 
 export default function Admin() {
